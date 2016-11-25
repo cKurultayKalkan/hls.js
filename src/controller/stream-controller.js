@@ -438,6 +438,7 @@ class StreamController extends EventHandler {
       }
       frag.loadIdx = this.fragLoadIdx;
       this.fragCurrent = frag;
+      this.fragCurrent.loaded = false;
       this.startFragRequested = true;
       this.fragTimeOffset = frag.start;
       hls.trigger(Event.FRAG_LOADING, {frag: frag});
@@ -680,12 +681,12 @@ class StreamController extends EventHandler {
 
   onMediaSeeking() {
     logger.log('media seeking to ' + this.media.currentTime);
+    var fragCurrent = this.fragCurrent;
     if (this.state === State.FRAG_LOADING) {
       // check if currently loaded fragment is inside buffer.
       //if outside, cancel fragment loading, otherwise do nothing
       if (BufferHelper.bufferInfo(this.media,this.media.currentTime,this.config.maxBufferHole).len === 0) {
         logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
-        var fragCurrent = this.fragCurrent;
         if (fragCurrent) {
           if (fragCurrent.loader) {
             fragCurrent.loader.abort();
@@ -699,6 +700,9 @@ class StreamController extends EventHandler {
     } else if (this.state === State.ENDED) {
         // switch to IDLE state to check for potential new fragment
         this.state = State.IDLE;
+    } else if (this.state === State.PARSING && fragCurrent && !fragCurrent.loaded) {
+      logger.log(`mediaController: no final chunk, switch back to IDLE state`);
+      this.state = State.IDLE;
     }
     if (this.media) {
       this.lastCurrentTime = this.media.currentTime;
@@ -859,6 +863,9 @@ class StreamController extends EventHandler {
       let demuxer = this.demuxer;
       if (demuxer) {
         demuxer.push(data.payload, audioCodec, currentLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, this.levels[level].details.endSN);
+      }
+      if (data.payload.final) {
+        fragCurrent.loaded = true;
       }
     }
     this.fragLoadError = 0;
