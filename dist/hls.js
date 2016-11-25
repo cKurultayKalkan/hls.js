@@ -2453,7 +2453,6 @@ var StreamController = function (_EventHandler) {
         _logger.logger.log('mediaController: no final chunk, switch back to IDLE state');
         this.state = State.IDLE;
       }
-
       if (this.media) {
         this.lastCurrentTime = this.media.currentTime;
       }
@@ -6650,7 +6649,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-38';
+      return '0.6.1-39';
     }
   }, {
     key: 'Events',
@@ -8779,7 +8778,7 @@ var MP4Remuxer = function () {
       }
       track.samples = samples;
 
-      this.remuxAudio(track, timeOffset, contiguous, stats);
+      this.remuxAudio(track, timeOffset, contiguous, undefined, stats);
     }
   }, {
     key: 'remuxID3',

@@ -591,7 +591,7 @@ class MP4Remuxer {
     }
     track.samples = samples;
 
-    this.remuxAudio(track, timeOffset, contiguous,stats);
+    this.remuxAudio(track, timeOffset, contiguous, undefined, stats);
   }
 
   remuxID3(track,timeOffset) {
