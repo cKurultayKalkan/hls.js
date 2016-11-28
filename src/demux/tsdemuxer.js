@@ -320,9 +320,12 @@
       endPTS = videoEndPTS;
       if (this._aacTrack.audiosamplerate) {
         let expectedSampleDuration = 1024/this._aacTrack.audiosamplerate;
+        let remuxAACCount = this._aacTrack.samples.length;
         let nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale : this.timeOffset;
         startPTS = Math.max(startPTS, nextAacPTS+(this.fragStartAACPos-this.remuxAACCount)*expectedSampleDuration);
-        endPTS = Math.min(endPTS, nextAacPTS+expectedSampleDuration*this._aacTrack.samples.length);
+        if (remuxAACCount) {
+          endPTS = Math.min(endPTS, nextAacPTS+expectedSampleDuration*remuxAACCount);
+        }
         let AVUnsync;
         if ((AVUnsync = endPTS-startPTS+videoStartPTS-videoEndPTS)>0.2) {
           this.fragStats.AVUnsync = AVUnsync;

@@ -5305,9 +5305,12 @@ var TSDemuxer = function () {
         endPTS = videoEndPTS;
         if (this._aacTrack.audiosamplerate) {
           var expectedSampleDuration = 1024 / this._aacTrack.audiosamplerate;
+          var remuxAACCount = this._aacTrack.samples.length;
           var nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts / timescale : this.timeOffset;
           startPTS = Math.max(startPTS, nextAacPTS + (this.fragStartAACPos - this.remuxAACCount) * expectedSampleDuration);
-          endPTS = Math.min(endPTS, nextAacPTS + expectedSampleDuration * this._aacTrack.samples.length);
+          if (remuxAACCount) {
+            endPTS = Math.min(endPTS, nextAacPTS + expectedSampleDuration * remuxAACCount);
+          }
           var AVUnsync = void 0;
           if ((AVUnsync = endPTS - startPTS + videoStartPTS - videoEndPTS) > 0.2) {
             this.fragStats.AVUnsync = AVUnsync;
@@ -8748,7 +8751,8 @@ var MP4Remuxer = function () {
       var pesTimeScale = this.PES_TIMESCALE,
           mp4timeScale = track.timescale ? track.timescale : track.audiosamplerate,
           pes2mp4ScaleFactor = pesTimeScale / mp4timeScale,
-          startDTS = (contiguous ? this.nextAacPts : timeOffset * pesTimeScale) + this._initDTS,
+          startDTS = (contiguous ? this.nextAacPts : videoData.startDTS * pesTimeScale) + this._initDTS,
+          endDTS = videoData.endDTS * pesTimeScale + this._initDTS,
 
 
       // one sample's duration value
@@ -8757,7 +8761,7 @@ var MP4Remuxer = function () {
 
 
       // samples count of this segment's duration
-      nbSamples = Math.ceil((videoData.endDTS - videoData.startDTS) * pesTimeScale / frameDuration),
+      nbSamples = Math.ceil((endDTS - startDTS) / frameDuration),
 
 
       // silent frame
