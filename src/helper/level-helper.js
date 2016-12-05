@@ -30,9 +30,11 @@ class LevelHelper {
         newFrag.endPTS = oldFrag.endPTS;
         newFrag.duration = oldFrag.duration;
         newFrag.PTSDTSshift = oldFrag.PTSDTSshift;
-        newFrag.firstGop = oldFrag.firstGop;
         newFrag.lastGop = oldFrag.lastGop;
         PTSFrag = newFrag;
+      }
+      if (oldFrag.firstGop) {
+        newFrag.firstGop = oldFrag.firstGop;
       }
     }
 

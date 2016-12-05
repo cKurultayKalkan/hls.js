@@ -6448,9 +6448,11 @@ var LevelHelper = function () {
           newFrag.endPTS = oldFrag.endPTS;
           newFrag.duration = oldFrag.duration;
           newFrag.PTSDTSshift = oldFrag.PTSDTSshift;
-          newFrag.firstGop = oldFrag.firstGop;
           newFrag.lastGop = oldFrag.lastGop;
           PTSFrag = newFrag;
+        }
+        if (oldFrag.firstGop) {
+          newFrag.firstGop = oldFrag.firstGop;
         }
       }
 
@@ -6652,7 +6654,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-39';
+      return '0.6.1-41';
     }
   }, {
     key: 'Events',
