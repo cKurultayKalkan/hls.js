@@ -27,6 +27,9 @@ var DemuxerWorker = function (self) {
       case 'demux':
         self.demuxer.push(new Uint8Array(data.data), data.audioCodec, data.videoCodec, data.timeOffset, data.cc, data.level, data.sn, data.duration, data.accurate, data.first, data.final, data.lastSN);
         break;
+      case 'empty':
+        self.postMessage({event: Event.DEMUXER_QUEUE_EMPTY});
+        break;
       default:
         break;
     }

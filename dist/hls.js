@@ -1772,7 +1772,7 @@ var StreamController = function (_EventHandler) {
   function StreamController(hls) {
     _classCallCheck(this, StreamController);
 
-    var _this = _possibleConstructorReturn(this, (StreamController.__proto__ || Object.getPrototypeOf(StreamController)).call(this, hls, _events2.default.MEDIA_ATTACHED, _events2.default.MEDIA_DETACHING, _events2.default.MANIFEST_LOADING, _events2.default.MANIFEST_PARSED, _events2.default.LEVEL_LOADED, _events2.default.LEVEL_PTS_UPDATED, _events2.default.KEY_LOADED, _events2.default.FRAG_CHUNK_LOADED, _events2.default.FRAG_LOADED, _events2.default.FRAG_LOAD_EMERGENCY_ABORTED, _events2.default.FRAG_PARSING_INIT_SEGMENT, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_PARSED, _events2.default.ERROR, _events2.default.BUFFER_APPENDED, _events2.default.BUFFER_FLUSHED));
+    var _this = _possibleConstructorReturn(this, (StreamController.__proto__ || Object.getPrototypeOf(StreamController)).call(this, hls, _events2.default.MEDIA_ATTACHED, _events2.default.MEDIA_DETACHING, _events2.default.MANIFEST_LOADING, _events2.default.MANIFEST_PARSED, _events2.default.LEVEL_LOADED, _events2.default.LEVEL_PTS_UPDATED, _events2.default.KEY_LOADED, _events2.default.FRAG_CHUNK_LOADED, _events2.default.FRAG_LOADED, _events2.default.FRAG_LOAD_EMERGENCY_ABORTED, _events2.default.FRAG_PARSING_INIT_SEGMENT, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_PARSED, _events2.default.ERROR, _events2.default.BUFFER_APPENDED, _events2.default.BUFFER_FLUSHED, _events2.default.DEMUXER_QUEUE_EMPTY));
 
     _this.config = hls.config;
     _this.audioCodecSwap = false;
@@ -1803,6 +1803,7 @@ var StreamController = function (_EventHandler) {
         this.stopLoad();
         if (!this.demuxer) {
           this.demuxer = new _demuxer2.default(this.hls);
+          this.fragParsing = null;
         }
         if (!this.timer) {
           this.timer = setInterval(this.ontick, 100);
@@ -1828,6 +1829,11 @@ var StreamController = function (_EventHandler) {
       }
     }
   }, {
+    key: 'onDemuxerQueueEmpty',
+    value: function onDemuxerQueueEmpty() {
+      this.fragParsing = null;
+    }
+  }, {
     key: 'stopLoad',
     value: function stopLoad() {
       var frag = this.fragCurrent;
@@ -1838,6 +1844,10 @@ var StreamController = function (_EventHandler) {
         this.fragCurrent = null;
       }
       this.fragPrevious = null;
+      if (this.state === State.PARSING && this.demuxer && this.demuxer.w) {
+        this.fragParsing = frag;
+        this.demuxer.w.postMessage({ cmd: 'empty' });
+      }
       this.state = State.STOPPED;
     }
   }, {
@@ -2389,6 +2399,7 @@ var StreamController = function (_EventHandler) {
       if (this.demuxer) {
         this.demuxer.destroy();
         this.demuxer = new _demuxer2.default(this.hls);
+        this.fragParsing = null;
       }
       if (this.levels && this.config.autoStartLoad) {
         this.hls.startLoad();
@@ -2515,6 +2526,7 @@ var StreamController = function (_EventHandler) {
       if (this.demuxer) {
         this.demuxer.destroy();
         this.demuxer = new _demuxer2.default(this.hls);
+        this.fragParsing = null;
       }
       if (this.config.autoStartLoad) {
         this.hls.startLoad();
@@ -2729,9 +2741,9 @@ var StreamController = function (_EventHandler) {
     value: function onFragParsingData(data) {
       var _this2 = this;
 
-      if (this.state === State.PARSING) {
+      if (this.state === State.PARSING || this.fragParsing) {
         this.tparse2 = Date.now();
-        var frag = this.fragCurrent;
+        var frag = this.fragCurrent || this.fragParsing;
         _logger.logger.log('parsed ' + data.type + ',PTS:[' + data.startPTS.toFixed(3) + ',' + data.endPTS.toFixed(3) + '],DTS:[' + data.startDTS.toFixed(3) + '/' + data.endDTS.toFixed(3) + '],nb:' + data.nb);
         var hls = this.hls;
 
@@ -4182,6 +4194,9 @@ var DemuxerWorker = function DemuxerWorker(self) {
         break;
       case 'demux':
         self.demuxer.push(new Uint8Array(data.data), data.audioCodec, data.videoCodec, data.timeOffset, data.cc, data.level, data.sn, data.duration, data.accurate, data.first, data.final, data.lastSN);
+        break;
+      case 'empty':
+        self.postMessage({ event: _events2.default.DEMUXER_QUEUE_EMPTY });
         break;
       default:
         break;
@@ -6238,7 +6253,8 @@ module.exports = {
   // fired when a decrypt key loading is completed - data: { frag : fragment object, payload : key payload, stats : { trequest, tfirst, tload, length}}
   KEY_LOADED: 'hlsKeyLoaded',
   // fired upon stream controller state transitions - data: {previousState, nextState}
-  STREAM_STATE_TRANSITION: 'hlsStreamStateTransition'
+  STREAM_STATE_TRANSITION: 'hlsStreamStateTransition',
+  DEMUXER_QUEUE_EMPTY: 'hlsDemuxerQueueEmpty'
 };
 
 },{}],24:[function(_dereq_,module,exports){
@@ -6654,7 +6670,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-41';
+      return '0.6.1-42';
     }
   }, {
     key: 'Events',
