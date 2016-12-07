@@ -147,6 +147,12 @@ class Demuxer {
         break;
     }
   }
+
+  waitQueue() {
+    if (this.w) {
+      this.w.postMessage({cmd: 'empty'});
+    }
+  }
 }
 
 export default Demuxer;

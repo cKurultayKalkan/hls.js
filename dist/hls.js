@@ -1844,9 +1844,9 @@ var StreamController = function (_EventHandler) {
         this.fragCurrent = null;
       }
       this.fragPrevious = null;
-      if (this.state === State.PARSING && this.demuxer && this.demuxer.w) {
+      if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
         this.fragParsing = frag;
-        this.demuxer.w.postMessage({ cmd: 'empty' });
+        this.demuxer.waitQueue();
       }
       this.state = State.STOPPED;
     }
@@ -4423,6 +4423,13 @@ var Demuxer = function () {
           break;
       }
     }
+  }, {
+    key: 'waitQueue',
+    value: function waitQueue() {
+      if (this.w) {
+        this.w.postMessage({ cmd: 'empty' });
+      }
+    }
   }]);
 
   return Demuxer;
@@ -6670,7 +6677,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-42';
+      return '0.6.1-43';
     }
   }, {
     key: 'Events',
