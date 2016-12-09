@@ -144,6 +144,8 @@ class Hls {
     this.streamController = new config.streamController(this);
     this.timelineController = new config.timelineController(this);
     this.keyLoader = new KeyLoader(this);
+    Hls.api.players.push(this);
+    Hls.api.emit(Event.PLAYER_CREATED, this);
   }
 
   destroy() {
@@ -162,6 +164,12 @@ class Hls {
     this.keyLoader.destroy();
     this.url = null;
     this.observer.removeAllListeners();
+    var globalId = Hls.api.players.indexOf(this);
+    if (globalId<0) {
+        return;
+    }
+    Hls.api.players.splice(globalId, 1);
+    Hls.api.emit(Event.PLAYER_DESTROYED, this);
   }
 
   attachMedia(media) {
@@ -308,5 +316,8 @@ class Hls {
     return this.levelController.manualLevel;
   }
 }
+
+Hls.api = new EventEmitter();
+Hls.api.players = [];
 
 export default Hls;

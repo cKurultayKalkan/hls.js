@@ -1,4 +1,8 @@
 module.exports = {
+  // fired by api when new player instance created - data: { instance }
+  PLAYER_CREATED: 'hlsPlayerCreated',
+  // fired by api when player instance gets destroyed - data: { instance }
+  PLAYER_DESTROYED: 'hlsPlayerDestroyed',
   // fired before MediaSource is attaching to media element - data: { media }
   MEDIA_ATTACHING: 'hlsMediaAttaching',
   // fired when MediaSource has been succesfully attached to media element - data: { }

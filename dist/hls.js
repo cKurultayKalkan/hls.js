@@ -6183,6 +6183,10 @@ exports.default = EventHandler;
 'use strict';
 
 module.exports = {
+  // fired by api when new player instance created - data: { instance }
+  PLAYER_CREATED: 'hlsPlayerCreated',
+  // fired by api when player instance gets destroyed - data: { instance }
+  PLAYER_DESTROYED: 'hlsPlayerDestroyed',
   // fired before MediaSource is attaching to media element - data: { media }
   MEDIA_ATTACHING: 'hlsMediaAttaching',
   // fired when MediaSource has been succesfully attached to media element - data: { }
@@ -6677,7 +6681,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-43';
+      return '0.6.1-44';
     }
   }, {
     key: 'Events',
@@ -6811,6 +6815,8 @@ var Hls = function () {
     this.streamController = new config.streamController(this);
     this.timelineController = new config.timelineController(this);
     this.keyLoader = new _keyLoader2.default(this);
+    Hls.api.players.push(this);
+    Hls.api.emit(_events2.default.PLAYER_CREATED, this);
   }
 
   _createClass(Hls, [{
@@ -6831,6 +6837,12 @@ var Hls = function () {
       this.keyLoader.destroy();
       this.url = null;
       this.observer.removeAllListeners();
+      var globalId = Hls.api.players.indexOf(this);
+      if (globalId < 0) {
+        return;
+      }
+      Hls.api.players.splice(globalId, 1);
+      Hls.api.emit(_events2.default.PLAYER_DESTROYED, this);
     }
   }, {
     key: 'attachMedia',
@@ -7026,6 +7038,9 @@ var Hls = function () {
 
   return Hls;
 }();
+
+Hls.api = new _events4.default();
+Hls.api.players = [];
 
 exports.default = Hls;
 
