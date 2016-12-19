@@ -293,6 +293,9 @@ class BufferController extends EventHandler {
   doAppending() {
     var hls = this.hls, sourceBuffer = this.sourceBuffer, segments = this.segments;
     if (sourceBuffer) {
+      if (!this.media) {
+        return;
+      }
       if (this.media.error) {
         segments = [];
         logger.error('trying to append although a media error occured, flush segment and abort');

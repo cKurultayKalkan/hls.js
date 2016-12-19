@@ -959,6 +959,9 @@ var BufferController = function (_EventHandler) {
           sourceBuffer = this.sourceBuffer,
           segments = this.segments;
       if (sourceBuffer) {
+        if (!this.media) {
+          return;
+        }
         if (this.media.error) {
           segments = [];
           _logger.logger.error('trying to append although a media error occured, flush segment and abort');
@@ -6681,7 +6684,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-47';
+      return '0.6.1-48';
     }
   }, {
     key: 'Events',
