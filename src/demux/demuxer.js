@@ -129,7 +129,9 @@ class Demuxer {
           startDTS: data.startDTS,
           endDTS: data.endDTS,
           type: data.type,
-          nb: data.nb
+          nb: data.nb,
+          dropped: data.dropped,
+          deltaPTS: data.deltaPTS,
         });
         break;
       case Event.FRAG_PARSING_METADATA:
