@@ -804,6 +804,14 @@ class StreamController extends EventHandler {
 
     if (newDetails.live) {
       var curDetails = curLevel.details;
+
+      if (this.levelLastLoaded !== undefined) {
+        let {start, end} = LevelHelper.probeDetails(this.levels[this.levelLastLoaded].details, newDetails);
+        if (end >= start) {
+          curDetails = this.levels[this.levelLastLoaded].details;
+        }
+      }
+
       if (curDetails) {
         // we already have details for that level, merge them
         LevelHelper.mergeDetails(curDetails,newDetails);

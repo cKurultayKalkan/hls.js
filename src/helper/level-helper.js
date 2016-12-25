@@ -6,14 +6,54 @@ import {logger} from '../utils/logger';
 
 class LevelHelper {
 
-  static mergeDetails(oldDetails,newDetails) {
-    var start = Math.max(oldDetails.startSN,newDetails.startSN)-newDetails.startSN,
-        end = Math.min(oldDetails.endSN,newDetails.endSN)-newDetails.startSN,
-        delta = newDetails.startSN - oldDetails.startSN,
-        oldfragments = oldDetails.fragments,
+  static probeDetails(oldDetails, newDetails) {
+    function getTimes(details) {
+      let startTS = 0, endTS = 0, i = 0;
+      for (; i < details.fragments.length; i++) {
+        if (details.fragments[i].programDateTime) {
+          break;
+        }
+      }
+      if (i !== details.fragments.length) {
+        startTS = endTS = details.fragments[i].programDateTime.getTime();
+        for (let j = 0; j < details.fragments.length-1; j++) {
+          if (j < i) {
+            startTS -= details.fragments[j].duration*1000;
+          } else {
+            endTS += details.fragments[j].duration*1000;
+          }
+        }
+        return {start: startTS, end: endTS};
+      }
+    }
+    let start = Math.max(oldDetails.startSN, newDetails.startSN) -
+        newDetails.startSN;
+    let end = Math.min(oldDetails.endSN,newDetails.endSN)-newDetails.startSN;
+    let delta = newDetails.startSN - oldDetails.startSN;
+    if (end >= start) {
+      return {start: start, end: end, delta: delta};
+    }
+    let oldTimes = getTimes(oldDetails), newTimes = getTimes(newDetails);
+    if (oldTimes && newTimes && oldTimes.start <= newTimes.start && oldTimes.end >= newTimes.start) {
+      start = delta = 0;
+      end = Math.min(newDetails.fragments.length, oldDetails.fragments.length)-1;
+      let ts = oldTimes.start;
+      // 0.1 sec grace
+      while (newTimes.start - ts > 100) {
+        ts += oldDetails.fragments[delta++].duration * 1000;
+        end--;
+      }
+      return {start: start, end: end, delta: delta};
+    }
+    return {start: 1, end: 0, delta: 0};
+  }
+
+  static mergeDetails(oldDetails, newDetails) {
+    var oldfragments = oldDetails.fragments,
         newfragments = newDetails.fragments,
         ccOffset =0,
         PTSFrag;
+    let {start, end, delta} = LevelHelper.probeDetails(oldDetails, newDetails);
 
     // check if old/new playlists have fragments in common
     if ( end < start) {
