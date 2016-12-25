@@ -465,8 +465,8 @@ class StreamController extends EventHandler {
       this.fragCurrent.loaded = false;
       this.startFragRequested = true;
       this.fragTimeOffset = frag.start;
-      hls.trigger(Event.FRAG_LOADING, {frag: frag});
       this.state = State.FRAG_LOADING;
+      hls.trigger(Event.FRAG_LOADING, {frag: frag});
       return true;
     }
   }
