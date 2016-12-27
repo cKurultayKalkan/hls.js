@@ -1,6 +1,6 @@
 {
   "name": "@hola.org/hls.js",
-  "version": "0.6.1-52",
+  "version": "0.6.1-53",
   "license": "Apache-2.0",
   "description": "Media Source Extension - HLS library, by/for Dailymotion",
   "homepage": "https://github.com/hola/hls.js",
@@ -23,7 +23,7 @@
     "clean": "rimraf dist/*",
     "prebuild": "npm run clean & npm run test",
     "build": "npm run babel && browserify -t browserify-versionify -t [babelify] -p browserify-derequire -s Hls src/index.js --debug | exorcist dist/hls.js.map -b . > dist/hls.js",
-    "postbuild": "node noamd.js && npm run minify",
+    "postbuild": "npm run minify",
     "minify": "uglifyjs dist/hls.js -c sequences=true,dead_code=true,conditionals=true,booleans=true,unused=true,if_return=true,join_vars=true,drop_console=true -m sort --screw-ie8 > dist/hls.min.js",
     "watch": "watchify --debug -s Hls src/index.js -t [babelify] -o dist/hls.js",
     "pretest": "npm run lint",
