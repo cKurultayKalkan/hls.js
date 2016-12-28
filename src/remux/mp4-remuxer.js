@@ -58,6 +58,8 @@ class MP4Remuxer {
             audioTrackLength = audioData.endPTS - audioStartPTS;
           }
           this.remuxVideo(videoTrack,timeOffset,contiguous,audioTrackLength,audioStartPTS,flush,stats);
+        } else if (!contiguous) {
+          this.nextAvcDts = undefined;
         }
       } else {
         let videoData;
@@ -174,7 +176,6 @@ class MP4Remuxer {
     }
 
     contiguous |= (inputSamples.length && this.nextAvcDts && Math.abs(timeOffset-this.nextAvcDts/pesTimeScale) < 0.1);
-
 
     // PTS is coded on 33bits, and can loop from -2^32 to 2^32
     // PTSNormalize will make PTS/DTS value monotonic, we use last known DTS value as reference value

@@ -399,7 +399,7 @@ class StreamController extends EventHandler {
           // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
           // let's try to load previous fragment again to get last keyframe
           // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
-          if (!holaSeek && this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !BufferHelper.isBuffered(media, bufferEnd))) {
+          if (this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !BufferHelper.isBuffered(media, bufferEnd))) {
             frag = fragments[curSNIdx-1];
             logger.warn(`SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this`);
             // decrement previous frag load counter to avoid frag loop loading error when next fragment will get reloaded
@@ -1042,12 +1042,16 @@ class StreamController extends EventHandler {
 
   onFragParsed(data) {
     if (this.state === State.PARSING) {
-      var level = this.levels[this.fragCurrent.level];
+      var frag, level = this.levels[this.fragCurrent.level];
       this.stats.tparsed = performance.now();
       this.state = State.PARSED;
       if (data.startPTS !== undefined && data.endPTS !== undefined) {
         var drift = LevelHelper.updateFragPTS(level.details,this.fragCurrent.sn,data.startPTS,data.endPTS,data.PTSDTSshift,data.lastGopPTS);
         this.hls.trigger(Event.LEVEL_PTS_UPDATED, {details: level.details, level: this.fragCurrent.level, drift: drift});
+      } else if ((frag = this.fragCurrent)) {
+        // forse reload of prev fragment if video samples not found
+        frag.dropped = 1;
+        frag.deltaPTS = this.config.maxSeekHole+1;
       }
       this._checkAppendedParsed();
     }

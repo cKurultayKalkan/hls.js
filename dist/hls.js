@@ -2165,7 +2165,7 @@ var StreamController = function (_EventHandler) {
             // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
             // let's try to load previous fragment again to get last keyframe
             // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
-            if (!holaSeek && this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !_bufferHelper2.default.isBuffered(media, bufferEnd))) {
+            if (this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !_bufferHelper2.default.isBuffered(media, bufferEnd))) {
               frag = fragments[curSNIdx - 1];
               _logger.logger.warn('SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this');
               // decrement previous frag load counter to avoid frag loop loading error when next fragment will get reloaded
@@ -2807,12 +2807,17 @@ var StreamController = function (_EventHandler) {
     key: 'onFragParsed',
     value: function onFragParsed(data) {
       if (this.state === State.PARSING) {
-        var level = this.levels[this.fragCurrent.level];
+        var frag,
+            level = this.levels[this.fragCurrent.level];
         this.stats.tparsed = performance.now();
         this.state = State.PARSED;
         if (data.startPTS !== undefined && data.endPTS !== undefined) {
           var drift = _levelHelper2.default.updateFragPTS(level.details, this.fragCurrent.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
           this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: level.details, level: this.fragCurrent.level, drift: drift });
+        } else if (frag = this.fragCurrent) {
+          // forse reload of prev fragment if video samples not found
+          frag.dropped = 1;
+          frag.deltaPTS = this.config.maxSeekHole + 1;
         }
         this._checkAppendedParsed();
       }
@@ -6772,7 +6777,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-53';
+      return '0.6.1-54';
     }
   }, {
     key: 'Events',
@@ -8358,6 +8363,8 @@ var MP4Remuxer = function () {
               audioTrackLength = audioData.endPTS - audioStartPTS;
             }
             this.remuxVideo(videoTrack, timeOffset, contiguous, audioTrackLength, audioStartPTS, flush, stats);
+          } else if (!contiguous) {
+            this.nextAvcDts = undefined;
           }
         } else {
           var videoData = void 0;
