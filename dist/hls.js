@@ -1000,6 +1000,7 @@ var BufferController = function (_EventHandler) {
               }
               event.details = _errors.ErrorDetails.BUFFER_APPEND_ERROR;
               event.frag = this.fragCurrent;
+              event.reason = err.message + ' (type:' + segment.type + ',size:' + segment.data.length + ')';
               /* with UHD content, we could get loop of quota exceeded error until
                 browser is able to evict some data from sourcebuffer. retrying help recovering this
               */
@@ -6778,7 +6779,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-55';
+      return '0.6.1-56';
     }
   }, {
     key: 'Events',
