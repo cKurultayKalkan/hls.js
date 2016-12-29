@@ -702,6 +702,7 @@ class StreamController extends EventHandler {
     this.media = null;
     this.loadedmetadata = false;
     this.stopLoad();
+    this.fragParsing = null;
   }
 
   onMediaSeeking() {

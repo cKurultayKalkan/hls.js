@@ -2453,6 +2453,7 @@ var StreamController = function (_EventHandler) {
       this.media = null;
       this.loadedmetadata = false;
       this.stopLoad();
+      this.fragParsing = null;
     }
   }, {
     key: 'onMediaSeeking',
@@ -6777,7 +6778,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-54';
+      return '0.6.1-55';
     }
   }, {
     key: 'Events',
