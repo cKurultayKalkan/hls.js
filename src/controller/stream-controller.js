@@ -43,8 +43,8 @@ class StreamController extends EventHandler {
       Event.FRAG_PARSING_INIT_SEGMENT,
       Event.FRAG_PARSING_DATA,
       Event.FRAG_PARSED,
+      Event.FRAG_APPENDED,
       Event.ERROR,
-      Event.BUFFER_APPENDED,
       Event.BUFFER_FLUSHED,
       Event.DEMUXER_QUEUE_EMPTY);
 
@@ -892,9 +892,6 @@ class StreamController extends EventHandler {
         }
       }
       logger.log(`Demuxing ${sn} of [${details.startSN} ,${details.endSN}],level ${level}, cc ${fragCurrent.cc}`);
-      if (data.payload.first) {
-        this.pendingAppending = 0;
-      }
       let demuxer = this.demuxer;
       if (demuxer) {
         demuxer.push(data.payload, audioCodec, currentLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, this.levels[level].details.endSN);
@@ -996,7 +993,6 @@ class StreamController extends EventHandler {
         logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
         var initSegment = track.initSegment;
         if (initSegment) {
-          this.pendingAppending++;
           this.hls.trigger(Event.BUFFER_APPENDING, {type: trackName, data: initSegment});
         }
       }
@@ -1026,7 +1022,6 @@ class StreamController extends EventHandler {
 
       [data.data1, data.data2].forEach(buffer => {
         if (buffer) {
-          this.pendingAppending++;
           hls.trigger(Event.BUFFER_APPENDING, {type: data.type, data: buffer});
         }
       });
@@ -1054,25 +1049,13 @@ class StreamController extends EventHandler {
         frag.dropped = 1;
         frag.deltaPTS = this.config.maxSeekHole+1;
       }
-      this._checkAppendedParsed();
+      this.hls.trigger(Event.FRAG_APPENDING);
     }
   }
 
-  onBufferAppended() {
-    switch (this.state) {
-      case State.PARSING:
-      case State.PARSED:
-        this.pendingAppending--;
-        this._checkAppendedParsed();
-        break;
-      default:
-        break;
-    }
-  }
-
-  _checkAppendedParsed() {
+  onFragAppended() {
     //trigger handler right now
-    if (this.state === State.PARSED && this.pendingAppending === 0)  {
+    if (this.state === State.PARSED)  {
       var frag = this.fragCurrent, stats = this.stats;
       if (frag) {
         this.fragPrevious = frag;
@@ -1083,6 +1066,8 @@ class StreamController extends EventHandler {
         this.state = State.IDLE;
       }
       this.tick();
+    } else {
+      logger.warn(`not in PARSED state but ${this.state}`);
     }
   }
 

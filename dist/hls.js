@@ -664,7 +664,7 @@ var BufferController = function (_EventHandler) {
 
     // the value that we have set mediasource.duration to
     // (the actual duration may be tweaked slighly by the browser)
-    var _this = _possibleConstructorReturn(this, (BufferController.__proto__ || Object.getPrototypeOf(BufferController)).call(this, hls, _events2.default.MEDIA_ATTACHING, _events2.default.MEDIA_DETACHING, _events2.default.BUFFER_RESET, _events2.default.BUFFER_APPENDING, _events2.default.BUFFER_CODECS, _events2.default.BUFFER_EOS, _events2.default.BUFFER_FLUSHING, _events2.default.LEVEL_UPDATED));
+    var _this = _possibleConstructorReturn(this, (BufferController.__proto__ || Object.getPrototypeOf(BufferController)).call(this, hls, _events2.default.MEDIA_ATTACHING, _events2.default.MEDIA_DETACHING, _events2.default.BUFFER_RESET, _events2.default.BUFFER_APPENDING, _events2.default.BUFFER_CODECS, _events2.default.BUFFER_EOS, _events2.default.BUFFER_FLUSHING, _events2.default.FRAG_APPENDING, _events2.default.LEVEL_UPDATED));
 
     _this._msDuration = null;
     // the value that we want to set mediaSource.duration to
@@ -733,6 +733,7 @@ var BufferController = function (_EventHandler) {
         this.sourceBuffer = {};
       }
       this.onmso = this.onmse = this.onmsc = null;
+      this.waitForAppended = false;
       this.hls.trigger(_events2.default.MEDIA_DETACHED);
     }
   }, {
@@ -761,6 +762,28 @@ var BufferController = function (_EventHandler) {
       _logger.logger.log('media source ended');
     }
   }, {
+    key: 'onFragAppending',
+    value: function onFragAppending() {
+      var segments = this.segments || [];
+      if (!segments.length) {
+        this.hls.trigger(_events2.default.FRAG_APPENDED);
+      } else {
+        this.waitForAppended = true;
+      }
+    }
+  }, {
+    key: 'isSbUpdating',
+    value: function isSbUpdating() {
+      var sourceBuffer = this.sourceBuffer;
+      if (sourceBuffer) {
+        for (var type in sourceBuffer) {
+          if (sourceBuffer[type].updating) {
+            return true;
+          }
+        }
+      }
+    }
+  }, {
     key: 'onSBUpdateEnd',
     value: function onSBUpdateEnd() {
 
@@ -774,9 +797,12 @@ var BufferController = function (_EventHandler) {
 
       this.updateMediaElementDuration();
 
-      this.hls.trigger(_events2.default.BUFFER_APPENDED);
-
       this.doAppending();
+
+      if (this.waitForAppended && !this.segments.length && !this.isSbUpdating()) {
+        this.hls.trigger(_events2.default.FRAG_APPENDED);
+        this.waitForAppended = false;
+      }
     }
   }, {
     key: 'onSBUpdateError',
@@ -967,11 +993,9 @@ var BufferController = function (_EventHandler) {
           _logger.logger.error('trying to append although a media error occured, flush segment and abort');
           return;
         }
-        for (var type in sourceBuffer) {
-          if (sourceBuffer[type].updating) {
-            //logger.log('sb update in progress');
-            return;
-          }
+        if (this.isSbUpdating()) {
+          //logger.log('sb update in progress');
+          return;
         }
         if (segments.length) {
           var segment = segments.shift();
@@ -1776,7 +1800,7 @@ var StreamController = function (_EventHandler) {
   function StreamController(hls) {
     _classCallCheck(this, StreamController);
 
-    var _this = _possibleConstructorReturn(this, (StreamController.__proto__ || Object.getPrototypeOf(StreamController)).call(this, hls, _events2.default.MEDIA_ATTACHED, _events2.default.MEDIA_DETACHING, _events2.default.MANIFEST_LOADING, _events2.default.MANIFEST_PARSED, _events2.default.LEVEL_LOADED, _events2.default.LEVEL_PTS_UPDATED, _events2.default.KEY_LOADED, _events2.default.FRAG_CHUNK_LOADED, _events2.default.FRAG_LOADED, _events2.default.FRAG_LOAD_EMERGENCY_ABORTED, _events2.default.FRAG_PARSING_INIT_SEGMENT, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_PARSED, _events2.default.ERROR, _events2.default.BUFFER_APPENDED, _events2.default.BUFFER_FLUSHED, _events2.default.DEMUXER_QUEUE_EMPTY));
+    var _this = _possibleConstructorReturn(this, (StreamController.__proto__ || Object.getPrototypeOf(StreamController)).call(this, hls, _events2.default.MEDIA_ATTACHED, _events2.default.MEDIA_DETACHING, _events2.default.MANIFEST_LOADING, _events2.default.MANIFEST_PARSED, _events2.default.LEVEL_LOADED, _events2.default.LEVEL_PTS_UPDATED, _events2.default.KEY_LOADED, _events2.default.FRAG_CHUNK_LOADED, _events2.default.FRAG_LOADED, _events2.default.FRAG_LOAD_EMERGENCY_ABORTED, _events2.default.FRAG_PARSING_INIT_SEGMENT, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_PARSED, _events2.default.FRAG_APPENDED, _events2.default.ERROR, _events2.default.BUFFER_FLUSHED, _events2.default.DEMUXER_QUEUE_EMPTY));
 
     _this.config = hls.config;
     _this.audioCodecSwap = false;
@@ -2653,9 +2677,6 @@ var StreamController = function (_EventHandler) {
           }
         }
         _logger.logger.log('Demuxing ' + sn + ' of [' + details.startSN + ' ,' + details.endSN + '],level ' + level + ', cc ' + fragCurrent.cc);
-        if (data.payload.first) {
-          this.pendingAppending = 0;
-        }
         var demuxer = this.demuxer;
         if (demuxer) {
           demuxer.push(data.payload, audioCodec, currentLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, this.levels[level].details.endSN);
@@ -2758,7 +2779,6 @@ var StreamController = function (_EventHandler) {
           _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']');
           var initSegment = track.initSegment;
           if (initSegment) {
-            this.pendingAppending++;
             this.hls.trigger(_events2.default.BUFFER_APPENDING, { type: trackName, data: initSegment });
           }
         }
@@ -2769,8 +2789,6 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'onFragParsingData',
     value: function onFragParsingData(data) {
-      var _this2 = this;
-
       if (this.state === State.PARSING || this.fragParsing) {
         this.tparse2 = Date.now();
         var frag = this.fragCurrent || this.fragParsing;
@@ -2791,7 +2809,6 @@ var StreamController = function (_EventHandler) {
 
         [data.data1, data.data2].forEach(function (buffer) {
           if (buffer) {
-            _this2.pendingAppending++;
             hls.trigger(_events2.default.BUFFER_APPENDING, { type: data.type, data: buffer });
           }
         });
@@ -2821,27 +2838,14 @@ var StreamController = function (_EventHandler) {
           frag.dropped = 1;
           frag.deltaPTS = this.config.maxSeekHole + 1;
         }
-        this._checkAppendedParsed();
+        this.hls.trigger(_events2.default.FRAG_APPENDING);
       }
     }
   }, {
-    key: 'onBufferAppended',
-    value: function onBufferAppended() {
-      switch (this.state) {
-        case State.PARSING:
-        case State.PARSED:
-          this.pendingAppending--;
-          this._checkAppendedParsed();
-          break;
-        default:
-          break;
-      }
-    }
-  }, {
-    key: '_checkAppendedParsed',
-    value: function _checkAppendedParsed() {
+    key: 'onFragAppended',
+    value: function onFragAppended() {
       //trigger handler right now
-      if (this.state === State.PARSED && this.pendingAppending === 0) {
+      if (this.state === State.PARSED) {
         var frag = this.fragCurrent,
             stats = this.stats;
         if (frag) {
@@ -2853,6 +2857,8 @@ var StreamController = function (_EventHandler) {
           this.state = State.IDLE;
         }
         this.tick();
+      } else {
+        _logger.logger.warn('not in PARSED state but ' + this.state);
       }
     }
   }, {
@@ -6250,8 +6256,6 @@ module.exports = {
   BUFFER_CODECS: 'hlsBufferCodecs',
   // fired when we append a segment to the buffer - data: { segment: segment object }
   BUFFER_APPENDING: 'hlsBufferAppending',
-  // fired when we are done with appending a media segment to the buffer
-  BUFFER_APPENDED: 'hlsBufferAppended',
   // fired when the stream is finished and we want to notify the media buffer that there will be no more data
   BUFFER_EOS: 'hlsBufferEos',
   // fired when the media buffer should be flushed - data {startOffset, endOffset}
@@ -6300,6 +6304,10 @@ module.exports = {
   FRAG_BUFFERED: 'hlsFragBuffered',
   // fired when fragment matching with current media position is changing - data : { frag : fragment object }
   FRAG_CHANGED: 'hlsFragChanged',
+  // fired when fragment chunks passed to media buffer
+  FRAG_APPENDING: 'hlsFragAppending',
+  // fired when fragment appended to media buffer
+  FRAG_APPENDED: 'hlsFragAppended',
   // Identifier for a FPS drop event - data: {curentDropped, currentDecoded, totalDroppedFrames}
   FPS_DROP: 'hlsFpsDrop',
   //triggered when FPS drop triggers auto level capping - data: {level, droppedlevel}
@@ -6779,7 +6787,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-56';
+      return '0.6.1-57';
     }
   }, {
     key: 'Events',

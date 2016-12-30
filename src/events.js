@@ -17,8 +17,6 @@ module.exports = {
   BUFFER_CODECS: 'hlsBufferCodecs',
   // fired when we append a segment to the buffer - data: { segment: segment object }
   BUFFER_APPENDING: 'hlsBufferAppending',
-  // fired when we are done with appending a media segment to the buffer
-  BUFFER_APPENDED: 'hlsBufferAppended',
   // fired when the stream is finished and we want to notify the media buffer that there will be no more data
   BUFFER_EOS: 'hlsBufferEos',
   // fired when the media buffer should be flushed - data {startOffset, endOffset}
@@ -67,6 +65,10 @@ module.exports = {
   FRAG_BUFFERED: 'hlsFragBuffered',
   // fired when fragment matching with current media position is changing - data : { frag : fragment object }
   FRAG_CHANGED: 'hlsFragChanged',
+  // fired when fragment chunks passed to media buffer
+  FRAG_APPENDING: 'hlsFragAppending',
+  // fired when fragment appended to media buffer
+  FRAG_APPENDED: 'hlsFragAppended',
   // Identifier for a FPS drop event - data: {curentDropped, currentDecoded, totalDroppedFrames}
   FPS_DROP: 'hlsFpsDrop',
   //triggered when FPS drop triggers auto level capping - data: {level, droppedlevel}
