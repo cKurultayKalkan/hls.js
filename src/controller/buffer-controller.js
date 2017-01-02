@@ -316,7 +316,7 @@ class BufferController extends EventHandler {
 
   doAppending() {
     var hls = this.hls, sourceBuffer = this.sourceBuffer, segments = this.segments;
-    if (sourceBuffer) {
+    if (sourceBuffer && Object.keys(sourceBuffer).length) {
       if (!this.media) {
         return;
       }

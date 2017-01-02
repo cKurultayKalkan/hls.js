@@ -984,7 +984,7 @@ var BufferController = function (_EventHandler) {
       var hls = this.hls,
           sourceBuffer = this.sourceBuffer,
           segments = this.segments;
-      if (sourceBuffer) {
+      if (sourceBuffer && Object.keys(sourceBuffer).length) {
         if (!this.media) {
           return;
         }
@@ -6787,7 +6787,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-57';
+      return '0.6.1-58';
     }
   }, {
     key: 'Events',
