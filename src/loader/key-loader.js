@@ -52,7 +52,7 @@ class KeyLoader extends EventHandler {
     if (this.loader) {
       this.loader.abort();
     }
-    this.hls.trigger(Event.ERROR, {type: ErrorTypes.NETWORK_ERROR, details: ErrorDetails.KEY_LOAD_ERROR, fatal: false, frag: this.frag, response: event});
+    this.hls.trigger(Event.ERROR, {type: ErrorTypes.NETWORK_ERROR, details: ErrorDetails.KEY_LOAD_ERROR, fatal: false, frag: this.frag, response: event.currentTarget});
   }
 
   loadtimeout() {

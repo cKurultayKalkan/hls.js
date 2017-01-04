@@ -2582,20 +2582,21 @@ var StreamController = function (_EventHandler) {
           newLevelId = data.level,
           curLevel = this.levels[newLevelId],
           duration = newDetails.totalduration,
-          sliding = 0;
+          sliding = 0,
+          lastDetails = this.levelLastLoaded !== undefined && this.levels[this.levelLastLoaded] && this.levels[this.levelLastLoaded].details;
 
       _logger.logger.log('level ' + newLevelId + ' loaded [' + newDetails.startSN + ',' + newDetails.endSN + '],duration:' + duration);
 
       if (newDetails.live) {
         var curDetails = curLevel.details;
 
-        if (this.levelLastLoaded !== undefined) {
-          var _LevelHelper$probeDet = _levelHelper2.default.probeDetails(this.levels[this.levelLastLoaded].details, newDetails),
+        if (lastDetails) {
+          var _LevelHelper$probeDet = _levelHelper2.default.probeDetails(lastDetails, newDetails),
               start = _LevelHelper$probeDet.start,
               end = _LevelHelper$probeDet.end;
 
           if (end >= start) {
-            curDetails = this.levels[this.levelLastLoaded].details;
+            curDetails = lastDetails;
           }
         }
 
@@ -2614,8 +2615,8 @@ var StreamController = function (_EventHandler) {
         }
       } else {
         newDetails.PTSKnown = false;
-        if (this.levelLastLoaded !== undefined && this.levels[this.levelLastLoaded].details) {
-          _levelHelper2.default.mergeDetails(this.levels[this.levelLastLoaded].details, newDetails);
+        if (lastDetails) {
+          _levelHelper2.default.mergeDetails(lastDetails, newDetails);
         }
       }
       // override level info
@@ -6787,7 +6788,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-58';
+      return '0.6.1-59';
     }
   }, {
     key: 'Events',
@@ -7352,7 +7353,7 @@ var KeyLoader = function (_EventHandler) {
       if (this.loader) {
         this.loader.abort();
       }
-      this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.NETWORK_ERROR, details: _errors.ErrorDetails.KEY_LOAD_ERROR, fatal: false, frag: this.frag, response: event });
+      this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.NETWORK_ERROR, details: _errors.ErrorDetails.KEY_LOAD_ERROR, fatal: false, frag: this.frag, response: event.currentTarget });
     }
   }, {
     key: 'loadtimeout',
