@@ -807,7 +807,9 @@ var BufferController = function (_EventHandler) {
   }, {
     key: 'onSBUpdateError',
     value: function onSBUpdateError(event) {
-      _logger.logger.error('sourceBuffer error:' + event);
+      var err = this.lastSegment ? 'last segment type:' + this.lastSegment.type + ',size:' + this.lastSegment.data.length + ')' : '';
+      _logger.logger.error('onSBUpdateError: sourceBuffer error:' + event + ' ' + err);
+      this.lastSegment = undefined;
       // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
       // this error might not always be fatal (it is fatal if decode error is set, in that case
       // it will be followed by a mediaElement error ...)
@@ -874,7 +876,9 @@ var BufferController = function (_EventHandler) {
   }, {
     key: 'onBufferAppendFail',
     value: function onBufferAppendFail(data) {
-      _logger.logger.error('sourceBuffer error:' + data.event);
+      var err = this.lastSegment ? 'last segment type:' + this.lastSegment.type + ',size:' + this.lastSegment.data.length + ')' : '';
+      _logger.logger.error('onBufferAppendFail:sourceBuffer error:' + data.event + ' ' + err);
+      this.lastSegment = undefined;
       // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
       // this error might not always be fatal (it is fatal if decode error is set, in that case
       // it will be followed by a mediaElement error ...)
@@ -1002,6 +1006,7 @@ var BufferController = function (_EventHandler) {
           try {
             //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
             if (sourceBuffer[segment.type]) {
+              this.lastSegment = segment;
               sourceBuffer[segment.type].appendBuffer(segment.data);
               this.appendError = 0;
               this.appended++;
@@ -6788,7 +6793,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-59';
+      return '0.6.1-60';
     }
   }, {
     key: 'Events',

@@ -153,7 +153,9 @@ class BufferController extends EventHandler {
   }
 
   onSBUpdateError(event) {
-    logger.error(`sourceBuffer error:${event}`);
+    let err = this.lastSegment ? `last segment type:${this.lastSegment.type},size:${this.lastSegment.data.length})` : '';
+    logger.error(`onSBUpdateError: sourceBuffer error:${event} ${err}`);
+    this.lastSegment = undefined;
     // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
     // this error might not always be fatal (it is fatal if decode error is set, in that case
     // it will be followed by a mediaElement error ...)
@@ -217,7 +219,9 @@ class BufferController extends EventHandler {
   }
 
   onBufferAppendFail(data) {
-    logger.error(`sourceBuffer error:${data.event}`);
+    let err = this.lastSegment ? `last segment type:${this.lastSegment.type},size:${this.lastSegment.data.length})` : '';
+    logger.error(`onBufferAppendFail:sourceBuffer error:${data.event} ${err}`);
+    this.lastSegment = undefined;
     // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
     // this error might not always be fatal (it is fatal if decode error is set, in that case
     // it will be followed by a mediaElement error ...)
@@ -334,6 +338,7 @@ class BufferController extends EventHandler {
         try {
           //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
           if(sourceBuffer[segment.type]) {
+            this.lastSegment = segment;
             sourceBuffer[segment.type].appendBuffer(segment.data);
             this.appendError = 0;
             this.appended++;
