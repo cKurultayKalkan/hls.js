@@ -156,6 +156,7 @@ class BufferController extends EventHandler {
     let err = this.lastSegment ? `last segment type:${this.lastSegment.type},size:${this.lastSegment.data.length})` : '';
     logger.error(`onSBUpdateError: sourceBuffer error:${event} ${err}`);
     this.lastSegment = undefined;
+    this.printDump();
     // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
     // this error might not always be fatal (it is fatal if decode error is set, in that case
     // it will be followed by a mediaElement error ...)
@@ -177,6 +178,7 @@ class BufferController extends EventHandler {
     this.sourceBuffer = {};
     this.flushRange = [];
     this.appended = 0;
+    this.dumpSegments = undefined;
   }
 
   onBufferCodecs(tracks) {
@@ -222,6 +224,7 @@ class BufferController extends EventHandler {
     let err = this.lastSegment ? `last segment type:${this.lastSegment.type},size:${this.lastSegment.data.length})` : '';
     logger.error(`onBufferAppendFail:sourceBuffer error:${data.event} ${err}`);
     this.lastSegment = undefined;
+    this.printDump();
     // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
     // this error might not always be fatal (it is fatal if decode error is set, in that case
     // it will be followed by a mediaElement error ...)
@@ -318,6 +321,32 @@ class BufferController extends EventHandler {
     }
   }
 
+  dumpSegment(segment) {
+    let i, len = segment.data.length;
+    let info = `type:${segment.type},size:${len},buf:[`;
+    for (i = 0, len = Math.min(len, 10); i<len; i++) {
+      if (i) {
+        info += ',';
+      }
+      info += segment.data[i];
+    }
+    info += '..]';
+    if (!this.dumpSegments) {
+      this.dumpSegments = [info];
+    } else {
+      this.dumpSegments.push(info);
+    }
+    if (this.dumpSegments.length>10) {
+      this.dumpSegments.shift();
+    }
+  }
+
+  printDump() {
+    if (this.dumpSegments && this.dumpSegments.length) {
+      logger.error(this.dumpSegments.join('|'));
+    }
+  }
+
   doAppending() {
     var hls = this.hls, sourceBuffer = this.sourceBuffer, segments = this.segments;
     if (sourceBuffer && Object.keys(sourceBuffer).length) {
@@ -335,6 +364,7 @@ class BufferController extends EventHandler {
       }
       if (segments.length) {
         var segment = segments.shift();
+        this.dumpSegment(segment);
         try {
           //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
           if(sourceBuffer[segment.type]) {

@@ -810,6 +810,7 @@ var BufferController = function (_EventHandler) {
       var err = this.lastSegment ? 'last segment type:' + this.lastSegment.type + ',size:' + this.lastSegment.data.length + ')' : '';
       _logger.logger.error('onSBUpdateError: sourceBuffer error:' + event + ' ' + err);
       this.lastSegment = undefined;
+      this.printDump();
       // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
       // this error might not always be fatal (it is fatal if decode error is set, in that case
       // it will be followed by a mediaElement error ...)
@@ -831,6 +832,7 @@ var BufferController = function (_EventHandler) {
       this.sourceBuffer = {};
       this.flushRange = [];
       this.appended = 0;
+      this.dumpSegments = undefined;
     }
   }, {
     key: 'onBufferCodecs',
@@ -879,6 +881,7 @@ var BufferController = function (_EventHandler) {
       var err = this.lastSegment ? 'last segment type:' + this.lastSegment.type + ',size:' + this.lastSegment.data.length + ')' : '';
       _logger.logger.error('onBufferAppendFail:sourceBuffer error:' + data.event + ' ' + err);
       this.lastSegment = undefined;
+      this.printDump();
       // according to http://www.w3.org/TR/media-source/#sourcebuffer-append-error
       // this error might not always be fatal (it is fatal if decode error is set, in that case
       // it will be followed by a mediaElement error ...)
@@ -983,6 +986,35 @@ var BufferController = function (_EventHandler) {
       }
     }
   }, {
+    key: 'dumpSegment',
+    value: function dumpSegment(segment) {
+      var i = void 0,
+          len = segment.data.length;
+      var info = 'type:' + segment.type + ',size:' + len + ',buf:[';
+      for (i = 0, len = Math.min(len, 10); i < len; i++) {
+        if (i) {
+          info += ',';
+        }
+        info += segment.data[i];
+      }
+      info += '..]';
+      if (!this.dumpSegments) {
+        this.dumpSegments = [info];
+      } else {
+        this.dumpSegments.push(info);
+      }
+      if (this.dumpSegments.length > 10) {
+        this.dumpSegments.shift();
+      }
+    }
+  }, {
+    key: 'printDump',
+    value: function printDump() {
+      if (this.dumpSegments && this.dumpSegments.length) {
+        _logger.logger.error(this.dumpSegments.join('|'));
+      }
+    }
+  }, {
     key: 'doAppending',
     value: function doAppending() {
       var hls = this.hls,
@@ -1003,6 +1035,7 @@ var BufferController = function (_EventHandler) {
         }
         if (segments.length) {
           var segment = segments.shift();
+          this.dumpSegment(segment);
           try {
             //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
             if (sourceBuffer[segment.type]) {
@@ -6793,7 +6826,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-60';
+      return '0.6.1-61';
     }
   }, {
     key: 'Events',
