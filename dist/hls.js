@@ -2815,8 +2815,8 @@ var StreamController = function (_EventHandler) {
         // loop through tracks that are going to be provided to bufferController
         for (trackName in tracks) {
           track = tracks[trackName];
-          _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']');
           var initSegment = track.initSegment;
+          _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']' + (initSegment ? ',init' : ''));
           if (initSegment) {
             this.hls.trigger(_events2.default.BUFFER_APPENDING, { type: trackName, data: initSegment });
           }
@@ -6030,7 +6030,7 @@ var TSDemuxer = function () {
         }
       }
       config = _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec);
-      if (track.audiosamplerate !== config.audiosamplerate || track.codec !== config.codec) {
+      if (track.audiosamplerate !== config.samplerate || track.codec !== config.codec) {
         track.config = config.config;
         track.audiosamplerate = config.samplerate;
         track.channelCount = config.channelCount;
@@ -6826,7 +6826,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-61';
+      return '0.6.1-62';
     }
   }, {
     key: 'Events',

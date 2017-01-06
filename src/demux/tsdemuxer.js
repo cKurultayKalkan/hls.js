@@ -900,7 +900,7 @@
       }
     }
     config = ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
-    if (track.audiosamplerate !== config.audiosamplerate || track.codec !== config.codec) {
+    if (track.audiosamplerate !== config.samplerate || track.codec !== config.codec) {
       track.config = config.config;
       track.audiosamplerate = config.samplerate;
       track.channelCount = config.channelCount;

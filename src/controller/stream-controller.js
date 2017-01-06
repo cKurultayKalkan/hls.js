@@ -991,8 +991,8 @@ class StreamController extends EventHandler {
       // loop through tracks that are going to be provided to bufferController
       for (trackName in tracks) {
         track = tracks[trackName];
-        logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]`);
         var initSegment = track.initSegment;
+        logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]${initSegment ? ',init' : ''}`);
         if (initSegment) {
           this.hls.trigger(Event.BUFFER_APPENDING, {type: trackName, data: initSegment});
         }
