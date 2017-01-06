@@ -731,6 +731,9 @@ var BufferController = function (_EventHandler) {
         this.media = null;
         this.pendingTracks = null;
         this.sourceBuffer = {};
+        this.flushRange = [];
+        this.segments = [];
+        this.appended = 0;
       }
       this.onmso = this.onmse = this.onmsc = null;
       this.waitForAppended = false;
@@ -1025,7 +1028,7 @@ var BufferController = function (_EventHandler) {
           return;
         }
         if (this.media.error) {
-          segments = [];
+          this.segments = [];
           _logger.logger.error('trying to append although a media error occured, flush segment and abort');
           return;
         }
@@ -1068,7 +1071,7 @@ var BufferController = function (_EventHandler) {
               */
               if (this.appendError > hls.config.appendErrorMaxRetry) {
                 _logger.logger.log('fail ' + hls.config.appendErrorMaxRetry + ' times to append segment in sourceBuffer');
-                segments = [];
+                this.segments = [];
                 event.fatal = true;
                 hls.trigger(_events2.default.ERROR, event);
                 return;
@@ -1079,7 +1082,7 @@ var BufferController = function (_EventHandler) {
             } else {
               // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
               // let's stop appending any segments, and report BUFFER_FULL_ERROR error
-              segments = [];
+              this.segments = [];
               event.details = _errors.ErrorDetails.BUFFER_FULL_ERROR;
               hls.trigger(_events2.default.ERROR, event);
             }
@@ -6826,7 +6829,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-62';
+      return '0.6.1-63';
     }
   }, {
     key: 'Events',

@@ -84,6 +84,9 @@ class BufferController extends EventHandler {
       this.media = null;
       this.pendingTracks = null;
       this.sourceBuffer = {};
+      this.flushRange = [];
+      this.segments = [];
+      this.appended = 0;
     }
     this.onmso = this.onmse = this.onmsc = null;
     this.waitForAppended = false;
@@ -354,7 +357,7 @@ class BufferController extends EventHandler {
         return;
       }
       if (this.media.error) {
-        segments = [];
+        this.segments = [];
         logger.error('trying to append although a media error occured, flush segment and abort');
         return;
       }
@@ -397,7 +400,7 @@ class BufferController extends EventHandler {
             */
             if (this.appendError > hls.config.appendErrorMaxRetry) {
               logger.log(`fail ${hls.config.appendErrorMaxRetry} times to append segment in sourceBuffer`);
-              segments = [];
+              this.segments = [];
               event.fatal = true;
               hls.trigger(Event.ERROR, event);
               return;
@@ -408,7 +411,7 @@ class BufferController extends EventHandler {
           } else {
             // QuotaExceededError: http://www.w3.org/TR/html5/infrastructure.html#quotaexceedederror
             // let's stop appending any segments, and report BUFFER_FULL_ERROR error
-            segments = [];
+            this.segments = [];
             event.details = ErrorDetails.BUFFER_FULL_ERROR;
             hls.trigger(Event.ERROR,event);
           }
