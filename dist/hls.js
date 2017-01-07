@@ -2581,6 +2581,7 @@ var StreamController = function (_EventHandler) {
       this.bufferRange = [];
       this.stalled = false;
       this.startPosition = this.lastCurrentTime = 0;
+      this.fragParsing = null;
     }
   }, {
     key: 'onManifestParsed',
@@ -6829,7 +6830,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-63';
+      return '0.6.1-64';
     }
   }, {
     key: 'Events',

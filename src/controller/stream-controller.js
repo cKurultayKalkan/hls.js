@@ -761,6 +761,7 @@ class StreamController extends EventHandler {
     this.bufferRange = [];
     this.stalled = false;
     this.startPosition = this.lastCurrentTime = 0;
+    this.fragParsing = null;
   }
 
   onManifestParsed(data) {
