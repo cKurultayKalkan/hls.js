@@ -993,7 +993,7 @@ class StreamController extends EventHandler {
       for (trackName in tracks) {
         track = tracks[trackName];
         var initSegment = track.initSegment;
-        logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]${initSegment ? ',init' : ''}`);
+        logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]${initSegment ? ',init:'+initSegment.length : ''}`);
         if (initSegment) {
           this.hls.trigger(Event.BUFFER_APPENDING, {type: trackName, data: initSegment});
         }

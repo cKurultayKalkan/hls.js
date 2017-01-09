@@ -168,7 +168,8 @@ class BufferController extends EventHandler {
   }
 
   onBufferReset() {
-    var sourceBuffer = this.sourceBuffer;
+    var sourceBuffer = this.sourceBuffer, segments = this.segments || [];
+    logger.log(`onBufferReset: pending segments:${segments.length}`);
     for(var type in sourceBuffer) {
       var sb = sourceBuffer[type];
       try {
@@ -326,7 +327,7 @@ class BufferController extends EventHandler {
 
   dumpSegment(segment) {
     let i, len = segment.data.length;
-    let info = `type:${segment.type},size:${len},buf:[`;
+    let info = `queue:${this.segments.length}type:${segment.type},size:${len},buf:[`;
     for (i = 0, len = Math.min(len, 10); i<len; i++) {
       if (i) {
         info += ',';

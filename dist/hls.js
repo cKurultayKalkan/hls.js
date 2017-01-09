@@ -823,7 +823,9 @@ var BufferController = function (_EventHandler) {
   }, {
     key: 'onBufferReset',
     value: function onBufferReset() {
-      var sourceBuffer = this.sourceBuffer;
+      var sourceBuffer = this.sourceBuffer,
+          segments = this.segments || [];
+      _logger.logger.log('onBufferReset: pending segments:' + segments.length);
       for (var type in sourceBuffer) {
         var sb = sourceBuffer[type];
         try {
@@ -993,7 +995,7 @@ var BufferController = function (_EventHandler) {
     value: function dumpSegment(segment) {
       var i = void 0,
           len = segment.data.length;
-      var info = 'type:' + segment.type + ',size:' + len + ',buf:[';
+      var info = 'queue:' + this.segments.length + 'type:' + segment.type + ',size:' + len + ',buf:[';
       for (i = 0, len = Math.min(len, 10); i < len; i++) {
         if (i) {
           info += ',';
@@ -2820,7 +2822,7 @@ var StreamController = function (_EventHandler) {
         for (trackName in tracks) {
           track = tracks[trackName];
           var initSegment = track.initSegment;
-          _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']' + (initSegment ? ',init' : ''));
+          _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']' + (initSegment ? ',init:' + initSegment.length : ''));
           if (initSegment) {
             this.hls.trigger(_events2.default.BUFFER_APPENDING, { type: trackName, data: initSegment });
           }
@@ -6830,7 +6832,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-64';
+      return '0.6.1-65';
     }
   }, {
     key: 'Events',
