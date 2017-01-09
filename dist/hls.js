@@ -2494,7 +2494,7 @@ var StreamController = function (_EventHandler) {
     key: 'onMediaDetaching',
     value: function onMediaDetaching() {
       var media = this.media;
-      if (media && media.ended) {
+      if (media && media.ended || this.state === State.ENDED) {
         _logger.logger.log('MSE detaching and video ended, reset startPosition');
         this.startPosition = this.lastCurrentTime = 0;
       }
@@ -6832,7 +6832,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-65';
+      return '0.6.1-66';
     }
   }, {
     key: 'Events',

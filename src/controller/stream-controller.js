@@ -675,7 +675,7 @@ class StreamController extends EventHandler {
 
   onMediaDetaching() {
     var media = this.media;
-    if (media && media.ended) {
+    if (media && media.ended || this.state === State.ENDED) {
       logger.log('MSE detaching and video ended, reset startPosition');
       this.startPosition = this.lastCurrentTime = 0;
     }
