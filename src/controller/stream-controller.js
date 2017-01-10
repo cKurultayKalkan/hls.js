@@ -720,12 +720,13 @@ class StreamController extends EventHandler {
   }
 
   onMediaSeeking() {
-    logger.log('media seeking to ' + this.media.currentTime);
+    let currentTime = this.media.currentTime;
+    logger.log('media seeking to ' + currentTime);
     var fragCurrent = this.fragCurrent;
     if (this.state === State.FRAG_LOADING) {
       // check if currently loaded fragment is inside buffer.
       //if outside, cancel fragment loading, otherwise do nothing
-      if (BufferHelper.bufferInfo(this.media,this.media.currentTime,this.config.maxBufferHole).len === 0) {
+      if (BufferHelper.bufferInfo(this.media,currentTime,this.config.maxBufferHole).len === 0) {
         logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
         if (fragCurrent) {
           if (fragCurrent.loader) {
@@ -745,11 +746,15 @@ class StreamController extends EventHandler {
       this.state = State.IDLE;
     }
     if (this.media) {
-      this.lastCurrentTime = this.media.currentTime;
+      this.lastCurrentTime = currentTime;
     }
     // avoid reporting fragment loop loading error in case user is seeking several times on same position
     if (this.fragLoadIdx !== undefined) {
       this.fragLoadIdx += 2 * this.config.fragLoadingLoopThreshold;
+    }
+    // in case seeking occurs although no media buffered, adjust startPosition and nextLoadPosition to seek target
+    if (!this.loadedmetadata) {
+      this.nextLoadPosition = this.startPosition = currentTime;
     }
     // tick to speed up processing
     this.tick();
@@ -1133,7 +1138,7 @@ _checkBuffer() {
         var loadedmetadata = this.loadedmetadata;
 
         // adjust currentTime to start position on loaded metadata
-        if(!loadedmetadata && media.buffered.length) {
+        if(!loadedmetadata && media.buffered.length && !media.seeking) {
           this.loadedmetadata = true;
           // only adjust currentTime if different from startPosition or if startPosition not buffered
           // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
