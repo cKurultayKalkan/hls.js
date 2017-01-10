@@ -68,11 +68,7 @@ class ExpGolomb {
       this.loadWord();
     }
     bits = size - bits;
-    if (bits > 0) {
-      return valu << bits | this.readBits(bits);
-    } else {
-      return valu;
-    }
+    return bits > 0 && this.bitsAvailable ? valu << bits | this.readBits(bits) : valu;
   }
 
   // ():uint

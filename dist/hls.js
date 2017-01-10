@@ -1942,9 +1942,7 @@ var StreamController = function (_EventHandler) {
           // determine load level
           var startLevel = hls.startLevel;
           if (startLevel === -1) {
-            // -1 : guess start Level by doing a bitrate test by loading first fragment of lowest quality level
             startLevel = 0;
-            this.fragBitrateTest = true;
           }
           // set new level to playlist loader : this will trigger start level load
           // hls.nextLoadLevel remains until it is set to a new value or until a new frag is successfully loaded
@@ -1966,6 +1964,14 @@ var StreamController = function (_EventHandler) {
             this.state = State.IDLE;
           }
           break;
+        case State.FRAG_LOADING:
+          try {
+            if (this.levels[this.level].details.live && this.fragCurrent.sn < this.levels[this.level].details.startSN) {
+              _logger.logger.log('live playlist slided forward loading segments: reload');
+              this.state = State.IDLE;
+            }
+          } catch (e) {}
+          break;
         case State.FRAG_LOADING_WAITING_RETRY:
           var now = performance.now();
           var retryDate = this.retryDate;
@@ -1980,7 +1986,6 @@ var StreamController = function (_EventHandler) {
         case State.ERROR:
         case State.PAUSED:
         case State.STOPPED:
-        case State.FRAG_LOADING:
         case State.PARSING:
         case State.PARSED:
         case State.ENDED:
@@ -2068,12 +2073,17 @@ var StreamController = function (_EventHandler) {
           levelDetails = _ref.levelDetails;
 
       var fragPrevious = this.fragPrevious,
-          level = this.level;
+          level = this.level,
+          fragments = levelDetails.fragments,
+          fragLen = fragments.length;
+
+      // empty playlist
+      if (fragLen === 0) {
+        return false;
+      }
 
       // find fragment index, contiguous with end of buffer position
-      var fragments = levelDetails.fragments,
-          fragLen = fragments.length,
-          start = fragments[0].start,
+      var start = fragments[0].start,
           end = fragments[fragLen - 1].start + fragments[fragLen - 1].duration,
           bufferEnd = bufferInfo.end,
           frag = void 0;
@@ -2213,7 +2223,7 @@ var StreamController = function (_EventHandler) {
           }
           // if maxFragLookUpTolerance will have negative value then don't return -1 for first element
           if (candidate.start - candidate.PTSDTSshift - maxFragLookUpTolerance > bufferEnd && candidate.start) {
-            return -1;
+            return candidate.sn > levelDetails.startSN ? -1 : 0;
           }
           return 0;
         });
@@ -2306,6 +2316,10 @@ var StreamController = function (_EventHandler) {
         this.fragCurrent.loaded = false;
         this.startFragRequested = true;
         this.fragTimeOffset = frag.start;
+        // lazy demuxer init, as this could take some time ... do it during frag loading
+        if (!this.demuxer) {
+          this.demuxer = new _demuxer2.default(hls, 'main');
+        }
         this.state = State.FRAG_LOADING;
         hls.trigger(_events2.default.FRAG_LOADING, { frag: frag });
         return true;
@@ -2696,7 +2710,7 @@ var StreamController = function (_EventHandler) {
     key: 'onFragChunkLoaded',
     value: function onFragChunkLoaded(data) {
       var fragCurrent = this.fragCurrent;
-      if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) && fragCurrent && !this.fragBitrateTest && data.frag.level === fragCurrent.level && data.frag.sn === fragCurrent.sn) {
+      if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) && fragCurrent && data.frag.level === fragCurrent.level && data.frag.sn === fragCurrent.sn) {
         _logger.logger.log('Loaded chunk ' + data.payload.byteLength + ' of frag ' + fragCurrent.sn + ' of level ' + fragCurrent.level);
         this.state = State.PARSING;
         // transmux the MPEG-TS data to ISO-BMFF segments
@@ -2734,19 +2748,8 @@ var StreamController = function (_EventHandler) {
     }
   }, {
     key: 'onFragLoaded',
-    value: function onFragLoaded(data) {
-      var fragCurrent = this.fragCurrent;
-      if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) && fragCurrent && data.frag.level === fragCurrent.level && data.frag.sn === fragCurrent.sn) {
-        _logger.logger.log('Loaded ' + fragCurrent.sn + ' of level ' + fragCurrent.level);
-        if (this.fragBitrateTest === true) {
-          // switch back to IDLE state ... we just loaded a fragment to determine adequate start bitrate and initialize autoswitch algo
-          this.state = State.IDLE;
-          this.fragBitrateTest = false;
-          this.startFragRequested = false;
-          data.stats.tparsed = data.stats.tbuffered = performance.now();
-          this.hls.trigger(_events2.default.FRAG_BUFFERED, { stats: data.stats, frag: fragCurrent });
-        }
-      }
+    value: function onFragLoaded() {
+      _logger.logger.log('Loaded ' + this.fragCurrent.sn + ' of level ' + this.fragCurrent.level);
       this.fragLoadError = 0;
     }
   }, {
@@ -2913,12 +2916,7 @@ var StreamController = function (_EventHandler) {
         case _errors.ErrorDetails.FRAG_LOAD_ERROR:
         case _errors.ErrorDetails.FRAG_LOAD_TIMEOUT:
           if (!data.fatal) {
-            var loadError = this.fragLoadError;
-            if (loadError) {
-              loadError++;
-            } else {
-              loadError = 1;
-            }
+            var loadError = (this.fragLoadError || 0) + 1;
             if (loadError <= this.config.fragLoadingMaxRetry) {
               this.fragLoadError = loadError;
               // reset load counter to avoid frag loop loading error
@@ -4627,11 +4625,7 @@ var ExpGolomb = function () {
         this.loadWord();
       }
       bits = size - bits;
-      if (bits > 0) {
-        return valu << bits | this.readBits(bits);
-      } else {
-        return valu;
-      }
+      return bits > 0 && this.bitsAvailable ? valu << bits | this.readBits(bits) : valu;
     }
 
     // ():uint
@@ -5575,7 +5569,7 @@ var TSDemuxer = function () {
       pesPrefix = (frag[0] << 16) + (frag[1] << 8) + frag[2];
       if (pesPrefix === 1) {
         pesLen = (frag[4] << 8) + frag[5];
-        if (pesLen && pesLen !== stream.size - 6) {
+        if (pesLen && pesLen > stream.size - 6) {
           return null;
         }
         pesFlags = frag[7];
@@ -5603,6 +5597,10 @@ var TSDemuxer = function () {
             if (pesDts > 4294967295) {
               // decrement 2^33
               pesDts -= 8589934592;
+            }
+            if (pesPts - pesDts > 60 * 90000) {
+              _logger.logger.warn(Math.round((pesPts - pesDts) / 90000) + 's delta between PTS and DTS, align them');
+              pesPts = pesDts;
             }
           } else {
             pesDts = pesPts;
@@ -5681,6 +5679,19 @@ var TSDemuxer = function () {
             push = true;
             if (debug) {
               debugString += 'NDR ';
+            }
+            // retrieve slice type by parsing beginning of NAL unit (follow H264 spec, slice_header definition) to detect keyframe embedded in NDR
+            var data = unit.data;
+            if (data.length > 1) {
+              var sliceType = new _expGolomb2.default(data).readSliceType();
+              // 2 : I slice, 4 : SI slice, 7 : I slice, 9: SI slice
+              // SI slice : A slice that is coded using intra prediction only and using quantisation of the prediction samples.
+              // An SI slice can be coded such that its decoded samples can be constructed identically to an SP slice.
+              // I slice: A slice that is not an SI slice that is decoded using intra prediction only.
+              //if (sliceType === 2 || sliceType === 7) {
+              if (sliceType === 2 || sliceType === 4 || sliceType === 7 || sliceType === 9) {
+                key = true;
+              }
             }
             break;
           //IDR
@@ -5809,6 +5820,10 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'AUD ';
             }
+            break;
+          // Filler Data
+          case 12:
+            push = false;
             break;
           default:
             push = false;
@@ -6832,7 +6847,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-66';
+      return '0.6.1-67';
     }
   }, {
     key: 'Events',

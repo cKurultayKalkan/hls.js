@@ -134,9 +134,7 @@ class StreamController extends EventHandler {
         // determine load level
         let startLevel = hls.startLevel;
         if (startLevel === -1) {
-          // -1 : guess start Level by doing a bitrate test by loading first fragment of lowest quality level
           startLevel = 0;
-          this.fragBitrateTest = true;
         }
         // set new level to playlist loader : this will trigger start level load
         // hls.nextLoadLevel remains until it is set to a new value or until a new frag is successfully loaded
@@ -158,6 +156,14 @@ class StreamController extends EventHandler {
           this.state = State.IDLE;
         }
         break;
+      case State.FRAG_LOADING:
+        try {
+          if (this.levels[this.level].details.live && this.fragCurrent.sn<this.levels[this.level].details.startSN) {
+            logger.log(`live playlist slided forward loading segments: reload`);
+            this.state = State.IDLE;
+          }
+        } catch(e){}
+        break;
       case State.FRAG_LOADING_WAITING_RETRY:
         var now = performance.now();
         var retryDate = this.retryDate;
@@ -172,7 +178,6 @@ class StreamController extends EventHandler {
       case State.ERROR:
       case State.PAUSED:
       case State.STOPPED:
-      case State.FRAG_LOADING:
       case State.PARSING:
       case State.PARSED:
       case State.ENDED:
@@ -253,12 +258,17 @@ class StreamController extends EventHandler {
 
   _fetchPayloadOrEos({pos, bufferInfo, levelDetails}) {
     const fragPrevious = this.fragPrevious,
-          level = this.level;
+          level = this.level,
+          fragments = levelDetails.fragments,
+          fragLen = fragments.length;
+
+    // empty playlist
+    if (fragLen === 0) {
+      return false;
+    }
 
     // find fragment index, contiguous with end of buffer position
-    let fragments = levelDetails.fragments,
-        fragLen = fragments.length,
-        start = fragments[0].start,
+    let start = fragments[0].start,
         end = fragments[fragLen-1].start + fragments[fragLen-1].duration,
         bufferEnd = bufferInfo.end,
         frag;
@@ -379,7 +389,7 @@ class StreamController extends EventHandler {
         }
         // if maxFragLookUpTolerance will have negative value then don't return -1 for first element
         if (candidate.start - candidate.PTSDTSshift - maxFragLookUpTolerance > bufferEnd && candidate.start) {
-          return -1;
+          return candidate.sn>levelDetails.startSN ? -1 : 0;
         }
         return 0;
       });
@@ -465,6 +475,10 @@ class StreamController extends EventHandler {
       this.fragCurrent.loaded = false;
       this.startFragRequested = true;
       this.fragTimeOffset = frag.start;
+      // lazy demuxer init, as this could take some time ... do it during frag loading
+      if (!this.demuxer) {
+        this.demuxer = new Demuxer(hls,'main');
+      }
       this.state = State.FRAG_LOADING;
       hls.trigger(Event.FRAG_LOADING, {frag: frag});
       return true;
@@ -866,8 +880,7 @@ class StreamController extends EventHandler {
   onFragChunkLoaded(data) {
     var fragCurrent = this.fragCurrent;
     if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) &&
-        fragCurrent && !this.fragBitrateTest &&
-        data.frag.level === fragCurrent.level &&
+        fragCurrent && data.frag.level === fragCurrent.level &&
         data.frag.sn === fragCurrent.sn) {
       logger.log(`Loaded chunk ${data.payload.byteLength} of frag ${fragCurrent.sn} of level ${fragCurrent.level}`);
       this.state = State.PARSING;
@@ -905,22 +918,8 @@ class StreamController extends EventHandler {
     this.fragLoadError = 0;
   }
 
-  onFragLoaded(data) {
-    var fragCurrent = this.fragCurrent;
-    if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) &&
-        fragCurrent &&
-        data.frag.level === fragCurrent.level &&
-        data.frag.sn === fragCurrent.sn) {
-      logger.log(`Loaded ${fragCurrent.sn} of level ${fragCurrent.level}`);
-      if (this.fragBitrateTest === true) {
-        // switch back to IDLE state ... we just loaded a fragment to determine adequate start bitrate and initialize autoswitch algo
-        this.state = State.IDLE;
-        this.fragBitrateTest = false;
-        this.startFragRequested = false;
-        data.stats.tparsed = data.stats.tbuffered = performance.now();
-        this.hls.trigger(Event.FRAG_BUFFERED, {stats: data.stats, frag: fragCurrent});
-      }
-    }
+  onFragLoaded() {
+    logger.log(`Loaded ${this.fragCurrent.sn} of level ${this.fragCurrent.level}`);
     this.fragLoadError = 0;
   }
 
@@ -1078,12 +1077,7 @@ class StreamController extends EventHandler {
       case ErrorDetails.FRAG_LOAD_ERROR:
       case ErrorDetails.FRAG_LOAD_TIMEOUT:
         if(!data.fatal) {
-          var loadError = this.fragLoadError;
-          if(loadError) {
-            loadError++;
-          } else {
-            loadError=1;
-          }
+          let loadError = (this.fragLoadError||0)+1;
           if (loadError <= this.config.fragLoadingMaxRetry) {
             this.fragLoadError = loadError;
             // reset load counter to avoid frag loop loading error
