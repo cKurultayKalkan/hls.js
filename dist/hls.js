@@ -1890,6 +1890,7 @@ var StreamController = function (_EventHandler) {
           this.state = State.IDLE;
         } else {
           this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
+          _logger.logger.log('configure lastCurrentTime @' + this.lastCurrentTime + ' start:' + this.startPosition + ',' + startPosition);
           this.state = State.STARTING;
         }
         this.nextLoadPosition = this.startPosition = this.lastCurrentTime;
@@ -6852,7 +6853,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-68';
+      return '0.6.1-69';
     }
   }, {
     key: 'Events',

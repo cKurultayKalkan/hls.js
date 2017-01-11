@@ -86,6 +86,7 @@ class StreamController extends EventHandler {
         this.state = State.IDLE;
       } else {
         this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
+        logger.log(`configure lastCurrentTime @${this.lastCurrentTime} start:${this.startPosition},${startPosition}`);
         this.state = State.STARTING;
       }
       this.nextLoadPosition = this.startPosition = this.lastCurrentTime;
