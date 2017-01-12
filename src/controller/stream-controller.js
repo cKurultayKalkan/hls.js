@@ -52,6 +52,7 @@ class StreamController extends EventHandler {
     this.audioCodecSwap = false;
     this.ticks = 0;
     this.ontick = this.tick.bind(this);
+    this.noMediaCount = 0;
   }
 
   destroy() {
@@ -144,6 +145,16 @@ class StreamController extends EventHandler {
         this.loadedmetadata = false;
         break;
       case State.IDLE:
+        if (!this.media) {
+          if ((this.noMediaCount++%20) === 0) {
+             let media = this.hls.bufferController.media||{};
+             if (media) {
+               logger.log(`no media ${media} src=${media.src}`);
+             }
+          }
+        } else {
+          this.noMediaCount = 0;
+        }
         // when this returns false there was an error and we shall return immediatly
         // from current tick
         if (!this._doTickIdle()) {
@@ -491,6 +502,10 @@ class StreamController extends EventHandler {
       const previousState = this.state;
       this._state = nextState;
       logger.log(`engine state transition from ${previousState} to ${nextState}`);
+      if (nextState === 'IDLE') {
+        let media = this.media||{};
+        logger.log(`media ${media} ct=${media.currentTime} dur=${media.duration} buf=${this.timeRangesToString(media.buffered)} err=${media.error}`);
+      }
       this.hls.trigger(Event.STREAM_STATE_TRANSITION, {previousState, nextState});
     }
   }
@@ -1250,6 +1265,9 @@ _checkBuffer() {
   }
 
   timeRangesToString(r) {
+    if (!r) {
+      return '[]';
+    }
     var log = '', len = r.length;
     for (var i=0; i<len; i++) {
       log += '[' + r.start(i) + ',' + r.end(i) + ']';

@@ -39,17 +39,29 @@ class LevelController extends EventHandler {
   }
 
   onManifestLoaded(data) {
-    var levels0 = [], levels = [], bitrateStart, i, bitrateSet = {}, videoCodecFound = false, audioCodecFound = false, hls = this.hls;
+    var levels0 = [],
+        levels = [],
+        bitrateStart,
+        bitrateSet = {},
+        videoCodecFound = false,
+        audioCodecFound = false,
+        hls = this.hls, i,
+        brokenmp4inmp3 = /chrome|firefox/.test(navigator.userAgent.toLowerCase()),
+        checkSupported = function(type,codec) { return MediaSource.isTypeSupported(`${type}/mp4;codecs=${codec}`);};
 
     // regroup redundant level together
     data.levels.forEach(level => {
       if(level.videoCodec) {
         videoCodecFound = true;
       }
-      if(level.audioCodec) {
+      // erase audio codec info if browser does not support mp4a.40.34. demuxer will autodetect codec and fallback to mpeg/audio
+      if(brokenmp4inmp3 && level.audioCodec && level.audioCodec.indexOf('mp4a.40.34') !== -1) {
+        level.audioCodec = undefined;
+      }
+      if(level.audioCodec || (level.attrs && level.attrs.AUDIO)) {
         audioCodecFound = true;
       }
-      var redundantLevelId = bitrateSet[level.bitrate];
+      let redundantLevelId = bitrateSet[level.bitrate];
       if (redundantLevelId === undefined) {
         bitrateSet[level.bitrate] = levels0.length;
         level.url = [level.url];
@@ -70,15 +82,11 @@ class LevelController extends EventHandler {
     } else {
       levels = levels0;
     }
-
     // only keep level with supported audio/video codecs
     levels = levels.filter(function(level) {
-      var checkSupportedAudio = function(codec) { return MediaSource.isTypeSupported(`audio/mp4;codecs=${codec}`);};
-      var checkSupportedVideo = function(codec) { return MediaSource.isTypeSupported(`video/mp4;codecs=${codec}`);};
-      var audioCodec = level.audioCodec, videoCodec = level.videoCodec;
-
-      return (!audioCodec || checkSupportedAudio(audioCodec)) &&
-             (!videoCodec || checkSupportedVideo(videoCodec));
+      let audioCodec = level.audioCodec, videoCodec = level.videoCodec;
+      return (!audioCodec || checkSupported('audio',audioCodec)) &&
+             (!videoCodec || checkSupported('video',videoCodec));
     });
 
     if(levels.length) {
@@ -130,12 +138,14 @@ class LevelController extends EventHandler {
        clearTimeout(this.timer);
        this.timer = null;
       }
-      this._level = newLevel;
-      logger.log(`switching to level ${newLevel}`);
-      this.hls.trigger(Event.LEVEL_SWITCH, {level: newLevel});
+      if (this._level !== newLevel) {
+        logger.log(`switching to level ${newLevel}`);
+        this._level = newLevel;
+        this.hls.trigger(Event.LEVEL_SWITCH, {level: newLevel});
+      }
       var level = levels[newLevel];
        // check if we need to load playlist for this level
-      if (level.details === undefined || level.details.live === true) {
+      if (!level.details || level.details.live === true) {
         // level not retrieved yet, or live playlist we need to (re)load it
         logger.log(`(re)loading playlist for level ${newLevel}`);
         var urlId = level.urlId;
@@ -170,11 +180,7 @@ class LevelController extends EventHandler {
   }
 
   get startLevel() {
-    if (this._startLevel === undefined) {
-      return this._firstLevel;
-    } else {
-      return this._startLevel;
-    }
+    return this._startLevel === undefined ? this._firstLevel : this._startLevel;
   }
 
   set startLevel(newLevel) {

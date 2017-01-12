@@ -1495,18 +1495,26 @@ var LevelController = function (_EventHandler) {
       var levels0 = [],
           levels = [],
           bitrateStart,
-          i,
           bitrateSet = {},
           videoCodecFound = false,
           audioCodecFound = false,
-          hls = this.hls;
+          hls = this.hls,
+          i,
+          brokenmp4inmp3 = /chrome|firefox/.test(navigator.userAgent.toLowerCase()),
+          checkSupported = function checkSupported(type, codec) {
+        return MediaSource.isTypeSupported(type + '/mp4;codecs=' + codec);
+      };
 
       // regroup redundant level together
       data.levels.forEach(function (level) {
         if (level.videoCodec) {
           videoCodecFound = true;
         }
-        if (level.audioCodec) {
+        // erase audio codec info if browser does not support mp4a.40.34. demuxer will autodetect codec and fallback to mpeg/audio
+        if (brokenmp4inmp3 && level.audioCodec && level.audioCodec.indexOf('mp4a.40.34') !== -1) {
+          level.audioCodec = undefined;
+        }
+        if (level.audioCodec || level.attrs && level.attrs.AUDIO) {
           audioCodecFound = true;
         }
         var redundantLevelId = bitrateSet[level.bitrate];
@@ -1530,19 +1538,11 @@ var LevelController = function (_EventHandler) {
       } else {
         levels = levels0;
       }
-
       // only keep level with supported audio/video codecs
       levels = levels.filter(function (level) {
-        var checkSupportedAudio = function checkSupportedAudio(codec) {
-          return MediaSource.isTypeSupported('audio/mp4;codecs=' + codec);
-        };
-        var checkSupportedVideo = function checkSupportedVideo(codec) {
-          return MediaSource.isTypeSupported('video/mp4;codecs=' + codec);
-        };
         var audioCodec = level.audioCodec,
             videoCodec = level.videoCodec;
-
-        return (!audioCodec || checkSupportedAudio(audioCodec)) && (!videoCodec || checkSupportedVideo(videoCodec));
+        return (!audioCodec || checkSupported('audio', audioCodec)) && (!videoCodec || checkSupported('video', videoCodec));
       });
 
       if (levels.length) {
@@ -1578,12 +1578,14 @@ var LevelController = function (_EventHandler) {
           clearTimeout(this.timer);
           this.timer = null;
         }
-        this._level = newLevel;
-        _logger.logger.log('switching to level ' + newLevel);
-        this.hls.trigger(_events2.default.LEVEL_SWITCH, { level: newLevel });
+        if (this._level !== newLevel) {
+          _logger.logger.log('switching to level ' + newLevel);
+          this._level = newLevel;
+          this.hls.trigger(_events2.default.LEVEL_SWITCH, { level: newLevel });
+        }
         var level = levels[newLevel];
         // check if we need to load playlist for this level
-        if (level.details === undefined || level.details.live === true) {
+        if (!level.details || level.details.live === true) {
           // level not retrieved yet, or live playlist we need to (re)load it
           _logger.logger.log('(re)loading playlist for level ' + newLevel);
           var urlId = level.urlId;
@@ -1744,11 +1746,7 @@ var LevelController = function (_EventHandler) {
   }, {
     key: 'startLevel',
     get: function get() {
-      if (this._startLevel === undefined) {
-        return this._firstLevel;
-      } else {
-        return this._startLevel;
-      }
+      return this._startLevel === undefined ? this._firstLevel : this._startLevel;
     },
     set: function set(newLevel) {
       this._startLevel = newLevel;
@@ -1849,6 +1847,7 @@ var StreamController = function (_EventHandler) {
     _this.audioCodecSwap = false;
     _this.ticks = 0;
     _this.ontick = _this.tick.bind(_this);
+    _this.noMediaCount = 0;
     return _this;
   }
 
@@ -1952,6 +1951,16 @@ var StreamController = function (_EventHandler) {
           this.loadedmetadata = false;
           break;
         case State.IDLE:
+          if (!this.media) {
+            if (this.noMediaCount++ % 20 === 0) {
+              var _media = this.hls.bufferController.media || {};
+              if (_media) {
+                _logger.logger.log('no media ' + _media + ' src=' + _media.src);
+              }
+            }
+          } else {
+            this.noMediaCount = 0;
+          }
           // when this returns false there was an error and we shall return immediatly
           // from current tick
           if (!this._doTickIdle()) {
@@ -3097,6 +3106,9 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'timeRangesToString',
     value: function timeRangesToString(r) {
+      if (!r) {
+        return '[]';
+      }
       var log = '',
           len = r.length;
       for (var i = 0; i < len; i++) {
@@ -3117,6 +3129,10 @@ var StreamController = function (_EventHandler) {
         var previousState = this.state;
         this._state = nextState;
         _logger.logger.log('engine state transition from ' + previousState + ' to ' + nextState);
+        if (nextState === 'IDLE') {
+          var media = this.media || {};
+          _logger.logger.log('media ' + media + ' ct=' + media.currentTime + ' dur=' + media.duration + ' buf=' + this.timeRangesToString(media.buffered) + ' err=' + media.error);
+        }
         this.hls.trigger(_events2.default.STREAM_STATE_TRANSITION, { previousState: previousState, nextState: nextState });
       }
     },
@@ -6853,7 +6869,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-69';
+      return '0.6.1-70';
     }
   }, {
     key: 'Events',
