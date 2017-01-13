@@ -135,6 +135,35 @@ class BufferController extends EventHandler {
     }
   }
 
+  dump(video) {
+    var str = '', b = video.buffered, len = b.length;
+    for (var i=0; i<len; i++) {
+      str += '['+b.start(i)+','+b.end(i)+']';
+    }
+    return str;
+  }
+
+  clear(video, keepSec) {
+    var st, sb = this.sourceBuffer, end = video.currentTime - keepSec;
+    var b = video.buffered, len = b.length;
+    if (end<=0 || (sb.audio && sb.audio.updating) || (sb.video && sb.video.updating)) {
+      return;
+    }
+    st = b.start(0);
+    for (var i=1; i<len; i++) {
+      st = Math.min(st, b.start(i));
+    }
+    if (st && st<end) {
+      logger.log(`video buffered: ${this.dump(this.media)} removing: [${st},${end}]`);
+      if (sb.audio) {
+        sb.audio.remove(st, end);
+      }
+      if (sb.video) {
+        sb.video.remove(st, end);
+      }
+    }
+  }
+
   onSBUpdateEnd() {
 
     if (this._needsFlush) {
@@ -152,6 +181,14 @@ class BufferController extends EventHandler {
     if (this.waitForAppended && !this.segments.length && !this.isSbUpdating()) {
       this.hls.trigger(Event.FRAG_APPENDED);
       this.waitForAppended = false;
+    }
+    let keep;
+    if ((keep = this.hls.config.keepBuffered) && this.media) {
+      try {
+        this.clear(this.media, keep);
+      } catch(err) {
+        logger.log(err);
+      }
     }
   }
 

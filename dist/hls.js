@@ -787,6 +787,42 @@ var BufferController = function (_EventHandler) {
       }
     }
   }, {
+    key: 'dump',
+    value: function dump(video) {
+      var str = '',
+          b = video.buffered,
+          len = b.length;
+      for (var i = 0; i < len; i++) {
+        str += '[' + b.start(i) + ',' + b.end(i) + ']';
+      }
+      return str;
+    }
+  }, {
+    key: 'clear',
+    value: function clear(video, keepSec) {
+      var st,
+          sb = this.sourceBuffer,
+          end = video.currentTime - keepSec;
+      var b = video.buffered,
+          len = b.length;
+      if (end <= 0 || sb.audio && sb.audio.updating || sb.video && sb.video.updating) {
+        return;
+      }
+      st = b.start(0);
+      for (var i = 1; i < len; i++) {
+        st = Math.min(st, b.start(i));
+      }
+      if (st && st < end) {
+        _logger.logger.log('video buffered: ' + this.dump(this.media) + ' removing: [' + st + ',' + end + ']');
+        if (sb.audio) {
+          sb.audio.remove(st, end);
+        }
+        if (sb.video) {
+          sb.video.remove(st, end);
+        }
+      }
+    }
+  }, {
     key: 'onSBUpdateEnd',
     value: function onSBUpdateEnd() {
 
@@ -805,6 +841,14 @@ var BufferController = function (_EventHandler) {
       if (this.waitForAppended && !this.segments.length && !this.isSbUpdating()) {
         this.hls.trigger(_events2.default.FRAG_APPENDED);
         this.waitForAppended = false;
+      }
+      var keep = void 0;
+      if ((keep = this.hls.config.keepBuffered) && this.media) {
+        try {
+          this.clear(this.media, keep);
+        } catch (err) {
+          _logger.logger.log(err);
+        }
       }
     }
   }, {
@@ -6869,7 +6913,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-70';
+      return '0.6.1-71';
     }
   }, {
     key: 'Events',
