@@ -148,11 +148,13 @@ class StreamController extends EventHandler {
         if (!this.media) {
           if ((this.noMediaCount++%20) === 0) {
              let media = this.hls.bufferController.media||{};
-             if (media) {
-               logger.log(`no media ${media} src=${media.src}`);
-             }
+             let ms = this.hls.bufferController.mediaSource||{};
+             logger.log(`no media ${media} src=${media.src} ms_state=${ms.readyState}`);
           }
         } else {
+          if (this.noMediaCount) {
+            logger.log(`media is set to ${this.media.src}`);
+          }
           this.noMediaCount = 0;
         }
         // when this returns false there was an error and we shall return immediatly
@@ -179,8 +181,7 @@ class StreamController extends EventHandler {
       case State.FRAG_LOADING_WAITING_RETRY:
         var now = performance.now();
         var retryDate = this.retryDate;
-        var media = this.media;
-        var isSeeking = media && media.seeking;
+        var isSeeking = this.media&&this.media.seeking;
         // if current time is gt than retryDate, or if media seeking let's switch to IDLE state to retry loading
         if(!retryDate || (now >= retryDate) || isSeeking) {
           logger.log(`mediaController: retryDate reached, switch back to IDLE state`);

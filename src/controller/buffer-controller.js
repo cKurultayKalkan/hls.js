@@ -27,7 +27,7 @@ class BufferController extends EventHandler {
     this._msDuration = null;
     // the value that we want to set mediaSource.duration to
     this._levelDuration = null;
-   
+
     // Source Buffer listeners
     this.onsbue = this.onSBUpdateEnd.bind(this);
     this.onsbe  = this.onSBUpdateError.bind(this);
@@ -41,7 +41,7 @@ class BufferController extends EventHandler {
     let media = this.media = data.media;
     if (media) {
       // setup the media source
-      var ms = this.mediaSource = new MediaSource();
+      let ms = this.mediaSource = new MediaSource();
       //Media Source listeners
       this.onmso = this.onMediaSourceOpen.bind(this);
       this.onmse = this.onMediaSourceEnded.bind(this);
@@ -50,7 +50,9 @@ class BufferController extends EventHandler {
       ms.addEventListener('sourceended', this.onmse);
       ms.addEventListener('sourceclose', this.onmsc);
       // link video and media Source
-      media.src = URL.createObjectURL(ms);
+      let url = URL.createObjectURL(ms);
+      logger.log(`set object url ${url}`);
+      media.src = url;
     }
   }
 

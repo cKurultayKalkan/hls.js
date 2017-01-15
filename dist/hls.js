@@ -696,7 +696,9 @@ var BufferController = function (_EventHandler) {
         ms.addEventListener('sourceended', this.onmse);
         ms.addEventListener('sourceclose', this.onmsc);
         // link video and media Source
-        media.src = URL.createObjectURL(ms);
+        var url = URL.createObjectURL(ms);
+        _logger.logger.log('set object url ' + url);
+        media.src = url;
       }
     }
   }, {
@@ -1997,12 +1999,14 @@ var StreamController = function (_EventHandler) {
         case State.IDLE:
           if (!this.media) {
             if (this.noMediaCount++ % 20 === 0) {
-              var _media = this.hls.bufferController.media || {};
-              if (_media) {
-                _logger.logger.log('no media ' + _media + ' src=' + _media.src);
-              }
+              var media = this.hls.bufferController.media || {};
+              var ms = this.hls.bufferController.mediaSource || {};
+              _logger.logger.log('no media ' + media + ' src=' + media.src + ' ms_state=' + ms.readyState);
             }
           } else {
+            if (this.noMediaCount) {
+              _logger.logger.log('media is set to ' + this.media.src);
+            }
             this.noMediaCount = 0;
           }
           // when this returns false there was an error and we shall return immediatly
@@ -2029,8 +2033,7 @@ var StreamController = function (_EventHandler) {
         case State.FRAG_LOADING_WAITING_RETRY:
           var now = performance.now();
           var retryDate = this.retryDate;
-          var media = this.media;
-          var isSeeking = media && media.seeking;
+          var isSeeking = this.media && this.media.seeking;
           // if current time is gt than retryDate, or if media seeking let's switch to IDLE state to retry loading
           if (!retryDate || now >= retryDate || isSeeking) {
             _logger.logger.log('mediaController: retryDate reached, switch back to IDLE state');
@@ -6913,7 +6916,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-71';
+      return '0.6.1-72';
     }
   }, {
     key: 'Events',
