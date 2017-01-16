@@ -6916,7 +6916,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-72';
+      return '0.6.1-73';
     }
   }, {
     key: 'Events',
@@ -7748,7 +7748,9 @@ var PlaylistLoader = function (_EventHandler) {
             break;
           case 'DIS':
             cc++;
-            tagList.push(result);
+            tagList.push(result.map(function (e) {
+              return (' ' + e).slice(1);
+            }));
             break;
           case 'BYTERANGE':
             var params = result[1].split('@');
@@ -7762,7 +7764,9 @@ var PlaylistLoader = function (_EventHandler) {
               frag.byteRangeStartOffset = byteRangeStartOffset;
               frag.byteRangeEndOffset = byteRangeEndOffset;
               frag.url = this.resolve(result[2], baseurl);
-              tagList.push(result);
+              tagList.push(result.map(function (e) {
+                return (' ' + e).slice(1);
+              }));
             }
             break;
           case 'INF':
@@ -7771,7 +7775,9 @@ var PlaylistLoader = function (_EventHandler) {
               var sn = currentSN++;
               fragdecryptdata = this.fragmentDecryptdataFromLevelkey(levelkey, sn);
               var url = result[2] ? this.resolve(result[2], baseurl) : null;
-              tagList.push(result);
+              tagList.push(result.map(function (e) {
+                return (' ' + e).slice(1);
+              }));
               frag = { url: url, duration: duration, start: totalduration, sn: sn, level: id, cc: cc, byteRangeStartOffset: byteRangeStartOffset, byteRangeEndOffset: byteRangeEndOffset, decryptdata: fragdecryptdata, programDateTime: programDateTime, tagList: tagList, PTSDTSshift: 0 };
               level.fragments.push(frag);
               totalduration += duration;
@@ -7806,15 +7812,21 @@ var PlaylistLoader = function (_EventHandler) {
               //we have not moved onto another segment, we are still parsing one
               fragdecryptdata = this.fragmentDecryptdataFromLevelkey(levelkey, currentSN - 1);
               frag.decryptdata = fragdecryptdata;
-              tagList.push(result);
+              tagList.push(result.map(function (e) {
+                return (' ' + e).slice(1);
+              }));
             }
             break;
           case 'PROGRAM-DATE-TIME':
             programDateTime = new Date(Date.parse(result[1]));
-            tagList.push(result);
+            tagList.push(result.map(function (e) {
+              return (' ' + e).slice(1);
+            }));
             break;
           default:
-            tagList.push(result);
+            tagList.push(result.map(function (e) {
+              return (' ' + e).slice(1);
+            }));
             break;
         }
       }
@@ -10879,7 +10891,7 @@ var URLHelper = {
     relativeURL = relativeURL.trim();
     if (/^[a-z]+:/i.test(relativeURL)) {
       // complete url, not relative
-      return relativeURL;
+      return (' ' + relativeURL).slice(1);
     }
 
     var relativeURLQuery = null;
@@ -10909,7 +10921,6 @@ var URLHelper = {
     if (!baseURLDomainSplit) {
       throw new Error('Error trying to parse base URL.');
     }
-
     // e.g. 'http:', 'https:', ''
     var baseURLProtocol = baseURLDomainSplit[2] || '';
     // e.g. 'http://example.com', '//example.com', ''

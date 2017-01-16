@@ -6,7 +6,7 @@ var URLHelper = {
     relativeURL = relativeURL.trim();
     if (/^[a-z]+:/i.test(relativeURL)) {
       // complete url, not relative
-      return relativeURL;
+      return (' '+relativeURL).slice(1);
     }
 
     var relativeURLQuery = null;
@@ -36,7 +36,6 @@ var URLHelper = {
     if (!baseURLDomainSplit) {
       throw new Error('Error trying to parse base URL.');
     }
-    
     // e.g. 'http:', 'https:', ''
     var baseURLProtocol = baseURLDomainSplit[2] || '';
     // e.g. 'http://example.com', '//example.com', ''

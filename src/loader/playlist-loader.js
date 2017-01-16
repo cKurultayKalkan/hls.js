@@ -196,7 +196,7 @@ class PlaylistLoader extends EventHandler {
           break;
         case 'DIS':
           cc++;
-          tagList.push(result);
+          tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
           break;
         case 'BYTERANGE':
           var params = result[1].split('@');
@@ -210,7 +210,7 @@ class PlaylistLoader extends EventHandler {
             frag.byteRangeStartOffset = byteRangeStartOffset;
             frag.byteRangeEndOffset = byteRangeEndOffset;
             frag.url = this.resolve(result[2], baseurl);
-            tagList.push(result);
+            tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
           }
           break;
         case 'INF':
@@ -219,7 +219,7 @@ class PlaylistLoader extends EventHandler {
             var sn = currentSN++;
             fragdecryptdata = this.fragmentDecryptdataFromLevelkey(levelkey, sn);
             var url = result[2] ? this.resolve(result[2], baseurl) : null;
-            tagList.push(result);
+            tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
             frag = {url: url, duration: duration, start: totalduration, sn: sn, level: id, cc: cc, byteRangeStartOffset: byteRangeStartOffset, byteRangeEndOffset: byteRangeEndOffset, decryptdata : fragdecryptdata, programDateTime: programDateTime, tagList: tagList, PTSDTSshift: 0};
             level.fragments.push(frag);
             totalduration += duration;
@@ -254,15 +254,15 @@ class PlaylistLoader extends EventHandler {
             //we have not moved onto another segment, we are still parsing one
             fragdecryptdata = this.fragmentDecryptdataFromLevelkey(levelkey, currentSN - 1);
             frag.decryptdata = fragdecryptdata;
-            tagList.push(result);
+            tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
           }
           break;
         case 'PROGRAM-DATE-TIME':
           programDateTime = new Date(Date.parse(result[1]));
-          tagList.push(result);
+          tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
           break;
         default:
-          tagList.push(result);
+          tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
           break;
       }
     }
