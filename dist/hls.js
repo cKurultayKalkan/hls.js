@@ -2777,13 +2777,13 @@ var StreamController = function (_EventHandler) {
         this.state = State.PARSING;
         // transmux the MPEG-TS data to ISO-BMFF segments
         this.stats = data.stats;
-        var currentLevel = this.levels[this.level],
-            details = currentLevel.details,
+        var level = fragCurrent.level,
+            fragLevel = this.levels[level],
+            details = fragLevel.details,
             duration = details.totalduration,
             start = this.fragTimeOffset,
-            level = fragCurrent.level,
             sn = fragCurrent.sn,
-            audioCodec = this.config.defaultAudioCodec || currentLevel.audioCodec;
+            audioCodec = this.config.defaultAudioCodec || fragLevel.audioCodec;
         if (this.audioCodecSwap) {
           _logger.logger.log('swapping playlist audio codec');
           if (audioCodec === undefined) {
@@ -2800,7 +2800,7 @@ var StreamController = function (_EventHandler) {
         _logger.logger.log('Demuxing ' + sn + ' of [' + details.startSN + ' ,' + details.endSN + '],level ' + level + ', cc ' + fragCurrent.cc);
         var demuxer = this.demuxer;
         if (demuxer) {
-          demuxer.push(data.payload, audioCodec, currentLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, this.levels[level].details.endSN);
+          demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, details.endSN);
         }
         if (data.payload.final) {
           fragCurrent.loaded = true;
@@ -6916,7 +6916,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-73';
+      return '0.6.1-74';
     }
   }, {
     key: 'Events',
