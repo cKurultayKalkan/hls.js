@@ -2033,9 +2033,8 @@ var StreamController = function (_EventHandler) {
         case State.FRAG_LOADING_WAITING_RETRY:
           var now = performance.now();
           var retryDate = this.retryDate;
-          var isSeeking = this.media && this.media.seeking;
           // if current time is gt than retryDate, or if media seeking let's switch to IDLE state to retry loading
-          if (!retryDate || now >= retryDate || isSeeking) {
+          if (!retryDate || now >= retryDate || this.media && this.media.seeking) {
             _logger.logger.log('mediaController: retryDate reached, switch back to IDLE state');
             this.state = State.IDLE;
           }
@@ -2070,7 +2069,7 @@ var StreamController = function (_EventHandler) {
       // start fragment already requested OR start frag prefetch disable
       // exit loop
       // => if media not attached but start frag prefetch is enabled and start frag not requested yet, we will not exit loop
-      if (!this.media && (this.startFragRequested || !config.startFragPrefetch)) {
+      if (this.levelLastLoaded !== undefined && !this.media && (this.startFragRequested || !config.startFragPrefetch)) {
         return true;
       }
 
@@ -2107,8 +2106,7 @@ var StreamController = function (_EventHandler) {
       _logger.logger.trace('buffer length of ' + bufferLen.toFixed(3) + ' is below max of ' + maxBufLen.toFixed(3) + '. checking for more payload ...');
 
       // set next load level : this will trigger a playlist load if needed
-      hls.nextLoadLevel = level;
-      this.level = level;
+      this.level = hls.nextLoadLevel = level;
 
       var levelDetails = this.levels[level].details;
       // if level info not retrieved yet, switch state and wait for level retrieval
@@ -2186,7 +2184,7 @@ var StreamController = function (_EventHandler) {
       //logger.log(`start/pos/bufEnd/seeking:${start.toFixed(3)}/${pos.toFixed(3)}/${bufferEnd.toFixed(3)}/${this.media.seeking}`);
       var maxLatency = config.liveMaxLatencyDuration !== undefined ? config.liveMaxLatencyDuration : config.liveMaxLatencyDurationCount * levelDetails.targetduration;
 
-      if (bufferEnd < Math.max(start, end - maxLatency)) {
+      if (bufferEnd < Math.max(start - config.maxFragLookUpTolerance, end - maxLatency)) {
         var liveSyncPosition = this.computeLivePosition(start, levelDetails);
         _logger.logger.log('buffer end: ' + bufferEnd.toFixed(3) + ' is located too far from the end of live sliding playlist, reset currentTime to : ' + liveSyncPosition.toFixed(3));
         bufferEnd = liveSyncPosition;
@@ -2477,10 +2475,13 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'immediateLevelSwitchEnd',
     value: function immediateLevelSwitchEnd() {
-      this.immediateSwitch = false;
       var media = this.media;
-      if (media && media.readyState) {
-        media.currentTime -= 0.0001;
+      if (media && media.buffered.length) {
+        this.immediateSwitch = false;
+        if (_bufferHelper2.default.isBuffered(media, media.currentTime)) {
+          // only nudge if currentTime is buffered
+          media.currentTime -= 0.0001;
+        }
         if (!this.previouslyPaused) {
           media.play();
         }
@@ -2848,9 +2849,9 @@ var StreamController = function (_EventHandler) {
             }
           }
           // HE-AAC is broken on Android, always signal audio codec as AAC even if variant manifest states otherwise
-          if (ua.indexOf('android') !== -1) {
+          if (ua.indexOf('android') !== -1 && track.container !== 'audio/mpeg') {
             audioCodec = 'mp4a.40.2';
-            _logger.logger.log('Android: force audio codec to' + audioCodec);
+            _logger.logger.log('Android: force audio codec to ' + audioCodec);
           }
           track.levelCodec = audioCodec;
         }
@@ -3025,75 +3026,69 @@ var StreamController = function (_EventHandler) {
     key: '_checkBuffer',
     value: function _checkBuffer() {
       var media = this.media;
-      if (media) {
-        // compare readyState
-        var readyState = media.readyState;
-        // if ready state different from HAVE_NOTHING (numeric value 0), we are allowed to seek
-        if (readyState) {
-          var currentTime;
-          currentTime = media.currentTime;
-          var loadedmetadata = this.loadedmetadata;
+      if (media && media.readyState) {
+        var currentTime;
+        currentTime = media.currentTime;
+        var loadedmetadata = this.loadedmetadata;
 
-          // adjust currentTime to start position on loaded metadata
-          if (!loadedmetadata && media.buffered.length && !media.seeking) {
-            this.loadedmetadata = true;
-            // only adjust currentTime if different from startPosition or if startPosition not buffered
-            // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
-            var startPosition = this.startPosition,
-                startPositionBuffered = _bufferHelper2.default.isBuffered(media, startPosition);
-            if (currentTime !== this.startPosition || !startPositionBuffered) {
-              _logger.logger.log('target start position:' + startPosition);
-              // if startPosition not buffered, let's seek to buffered.start(0)
-              if (!startPositionBuffered) {
-                startPosition = media.buffered.start(0);
-                _logger.logger.log('target start position not buffered, seek to buffered.start(0) ' + startPosition);
-              }
-              _logger.logger.log('adjust currentTime from ' + currentTime + ' to ' + startPosition);
-              media.currentTime = startPosition;
+        // adjust currentTime to start position on loaded metadata
+        if (!loadedmetadata && media.buffered.length) {
+          this.loadedmetadata = true;
+          // only adjust currentTime if different from startPosition or if startPosition not buffered
+          // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
+          var startPosition = this.startPosition,
+              startPositionBuffered = _bufferHelper2.default.isBuffered(media, startPosition);
+          if (currentTime !== this.startPosition || !startPositionBuffered) {
+            _logger.logger.log('target start position:' + startPosition);
+            // if startPosition not buffered, let's seek to buffered.start(0)
+            if (!startPositionBuffered) {
+              startPosition = media.buffered.start(0);
+              _logger.logger.log('target start position not buffered, seek to buffered.start(0) ' + startPosition);
             }
-          } else {
-            var bufferInfo = _bufferHelper2.default.bufferInfo(media, currentTime, 0),
-                expectedPlaying = !(media.paused || media.ended || media.buffered.length === 0),
-                jumpThreshold = 0.5,
-                // tolerance needed as some browsers stalls playback before reaching buffered range end
-            playheadMoving = currentTime > media.playbackRate * this.lastCurrentTime;
-
-            if (this.stalled && playheadMoving) {
-              this.stalled = false;
-              _logger.logger.log('playback not stuck anymore @' + currentTime);
-            }
-            // check buffer upfront
-            // if less than jumpThreshold second is buffered, and media is expected to play but playhead is not moving,
-            // and we have a new buffer range available upfront, let's seek to that one
-            if (expectedPlaying && bufferInfo.len <= jumpThreshold) {
-              if (playheadMoving) {
-                // playhead moving
-                jumpThreshold = 0;
+            _logger.logger.log('adjust currentTime from ' + currentTime + ' to ' + startPosition);
+            media.currentTime = startPosition;
+          }
+        } else {
+          var bufferInfo = _bufferHelper2.default.bufferInfo(media, currentTime, 0),
+              expectedPlaying = !(media.paused || media.ended || media.seeking || media.buffered.length === 0),
+              jumpThreshold = 0.5,
+              // tolerance needed as some browsers stalls playback before reaching buffered range end
+          playheadMoving = currentTime > media.playbackRate * this.lastCurrentTime;
+          if (this.stalled && playheadMoving) {
+            this.stalled = false;
+            _logger.logger.log('playback not stuck anymore @' + currentTime);
+          }
+          // check buffer upfront
+          // if less than jumpThreshold second is buffered, and media is expected to play but playhead is not moving,
+          // and we have a new buffer range available upfront, let's seek to that one
+          if (expectedPlaying && bufferInfo.len <= jumpThreshold) {
+            if (playheadMoving) {
+              // playhead moving
+              jumpThreshold = 0;
+              this.seekHoleNudgeDuration = 0;
+            } else {
+              // playhead not moving AND media expected to play
+              if (!this.stalled) {
                 this.seekHoleNudgeDuration = 0;
+                _logger.logger.log('playback seems stuck @' + currentTime);
+                this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false });
+                this.stalled = true;
               } else {
-                // playhead not moving AND media expected to play
-                if (!this.stalled) {
-                  this.seekHoleNudgeDuration = 0;
-                  _logger.logger.log('playback seems stuck @' + currentTime);
-                  this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false });
-                  this.stalled = true;
-                } else {
-                  this.seekHoleNudgeDuration += this.config.seekHoleNudgeDuration;
-                }
+                this.seekHoleNudgeDuration += this.config.seekHoleNudgeDuration;
               }
-              // if we are below threshold, try to jump if next buffer range is close
-              if (bufferInfo.len <= jumpThreshold) {
-                // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
-                var nextBufferStart = bufferInfo.nextStart,
-                    delta = nextBufferStart - currentTime;
-                if (nextBufferStart && delta < this.config.maxSeekHole && delta > 0) {
-                  // next buffer is close ! adjust currentTime to nextBufferStart
-                  // this will ensure effective video decoding
-                  _logger.logger.log('adjust currentTime from ' + media.currentTime + ' to next buffered @ ' + nextBufferStart + ' + nudge ' + this.seekHoleNudgeDuration);
-                  var hole = nextBufferStart + this.seekHoleNudgeDuration - media.currentTime;
-                  media.currentTime = nextBufferStart + this.seekHoleNudgeDuration;
-                  this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole: hole });
-                }
+            }
+            // if we are below threshold, try to jump if next buffer range is close
+            if (bufferInfo.len <= jumpThreshold) {
+              // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
+              var nextBufferStart = bufferInfo.nextStart,
+                  delta = nextBufferStart - currentTime;
+              if (nextBufferStart && delta < this.config.maxSeekHole && delta > 0) {
+                // next buffer is close ! adjust currentTime to nextBufferStart
+                // this will ensure effective video decoding
+                _logger.logger.log('adjust currentTime from ' + media.currentTime + ' to next buffered @ ' + nextBufferStart + ' + nudge ' + this.seekHoleNudgeDuration);
+                var hole = nextBufferStart + this.seekHoleNudgeDuration - media.currentTime;
+                media.currentTime = nextBufferStart + this.seekHoleNudgeDuration;
+                this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole: hole });
               }
             }
           }
@@ -6916,7 +6911,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-74';
+      return '0.6.1-75';
     }
   }, {
     key: 'Events',
