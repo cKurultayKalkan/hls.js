@@ -1152,7 +1152,7 @@ class StreamController extends EventHandler {
       var loadedmetadata = this.loadedmetadata;
 
       // adjust currentTime to start position on loaded metadata
-      if(!loadedmetadata && media.buffered.length) {
+      if(!loadedmetadata && media.buffered.length && !media.seeking) {
         this.loadedmetadata = true;
         // only adjust currentTime if different from startPosition or if startPosition not buffered
         // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
