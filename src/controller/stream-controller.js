@@ -744,7 +744,7 @@ class StreamController extends EventHandler {
     if (this.state === State.FRAG_LOADING) {
       // check if currently loaded fragment is inside buffer.
       //if outside, cancel fragment loading, otherwise do nothing
-      if (BufferHelper.bufferInfo(this.media,currentTime,this.config.maxBufferHole).len === 0) {
+      if (BufferHelper.bufferInfo(this.media,currentTime,0).len === 0) {
         logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
         if (fragCurrent) {
           if (fragCurrent.loader) {
@@ -757,8 +757,8 @@ class StreamController extends EventHandler {
         this.state = State.IDLE;
       }
     } else if (this.state === State.ENDED) {
-        // switch to IDLE state to check for potential new fragment
-        this.state = State.IDLE;
+      // switch to IDLE state to check for potential new fragment
+      this.state = State.IDLE;
     } else if (this.state === State.PARSING && fragCurrent && !fragCurrent.loaded) {
       logger.log(`mediaController: no final chunk, switch back to IDLE state`);
       this.state = State.IDLE;
@@ -938,7 +938,6 @@ class StreamController extends EventHandler {
         fragCurrent.loaded = true;
       }
     }
-    this.fragLoadError = 0;
   }
 
   onFragLoaded() {

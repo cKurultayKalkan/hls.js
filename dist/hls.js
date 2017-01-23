@@ -2604,7 +2604,7 @@ var StreamController = function (_EventHandler) {
       if (this.state === State.FRAG_LOADING) {
         // check if currently loaded fragment is inside buffer.
         //if outside, cancel fragment loading, otherwise do nothing
-        if (_bufferHelper2.default.bufferInfo(this.media, currentTime, this.config.maxBufferHole).len === 0) {
+        if (_bufferHelper2.default.bufferInfo(this.media, currentTime, 0).len === 0) {
           _logger.logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
           if (fragCurrent) {
             if (fragCurrent.loader) {
@@ -2807,7 +2807,6 @@ var StreamController = function (_EventHandler) {
           fragCurrent.loaded = true;
         }
       }
-      this.fragLoadError = 0;
     }
   }, {
     key: 'onFragLoaded',
@@ -6911,7 +6910,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-76';
+      return '0.6.1-77';
     }
   }, {
     key: 'Events',
