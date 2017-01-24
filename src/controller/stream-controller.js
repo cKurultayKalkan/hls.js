@@ -485,6 +485,7 @@ class StreamController extends EventHandler {
       this.fragCurrent = frag;
       this.fragCurrent.loaded = false;
       this.startFragRequested = true;
+      this.nextLoadPosition = frag.start + frag.duration;
       this.fragTimeOffset = frag.start;
       // lazy demuxer init, as this could take some time ... do it during frag loading
       if (!this.demuxer) {
@@ -1049,7 +1050,6 @@ class StreamController extends EventHandler {
         }
       });
 
-      this.nextLoadPosition = data.endPTS;
       this.bufferRange.push({type: data.type, start: data.startPTS, end: data.endPTS, frag: frag});
 
       //trigger handler right now
