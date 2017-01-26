@@ -300,11 +300,11 @@
   remux(data, final, flush, lastSegment) {
     var _saveAVCSamples = [], _saveAACSamples = [], _saveID3Samples = [],
         _saveTextSamples = [], maxk, samples = this._avcTrack.samples,
-        startPTS, endPTS, gopEndDTS;
+        startPTS, endPTS, gopEndDTS, initDTS;
     let timescale = this.remuxer.PES_TIMESCALE;
     if (samples.length && final) {
       this.fragStats.PTSDTSshift = ((this.fragStartPts === undefined ? samples[0].pts : this.fragStartPts)-(this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts))/timescale;
-      let initDTS = this.remuxer._initDTS === undefined ?
+      initDTS = this.remuxer._initDTS === undefined ?
         samples[0].dts -timescale * this.timeOffset : this.remuxer._initDTS;
       let startDTS = Math.max(this.remuxer._PTSNormalize((this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS) - initDTS,this.nextAvcDts),0);
       let sample = samples[samples.length-1];
@@ -337,6 +337,9 @@
       // save samples and break by GOP
       for (maxk=samples.length-1; maxk>0; maxk--) {
         if (samples[maxk].key) {
+          if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < startPTS) {
+            maxk = 0;
+          }
           break;
         }
       }
