@@ -979,12 +979,10 @@ var BufferController = function (_EventHandler) {
   }, {
     key: 'updateMediaElementDuration',
     value: function updateMediaElementDuration() {
-      if (this._levelDuration === null) {
-        return;
-      }
-      var media = this.media;
-      var mediaSource = this.mediaSource;
-      if (!media || !mediaSource || media.readyState === 0 || mediaSource.readyState !== 'open') {
+      var media = this.media,
+          mediaSource = this.mediaSource,
+          levelDuration = this._levelDuration;
+      if (levelDuration === null || !media || !mediaSource || media.readyState === 0 || mediaSource.readyState !== 'open') {
         return;
       }
       for (var i = 0; i < mediaSource.sourceBuffers.length; i++) {
@@ -997,12 +995,14 @@ var BufferController = function (_EventHandler) {
         // initialise to the value that the media source is reporting
         this._msDuration = mediaSource.duration;
       }
-      // this._levelDuration was the last value we set.
+      var duration = media.duration;
+      // levelDuration was the last value we set.
       // not using mediaSource.duration as the browser may tweak this value
-      if (this._levelDuration !== this._msDuration) {
-        _logger.logger.log('Updating mediasource duration to ' + this._levelDuration);
-        mediaSource.duration = this._levelDuration;
-        this._msDuration = this._levelDuration;
+      // only update mediasource duration if its value increase, this is to avoid
+      // flushing already buffered portion when switching between quality level
+      if (levelDuration > this._msDuration && levelDuration > duration || duration === Infinity || isNaN(duration)) {
+        _logger.logger.log('Updating mediasource duration to ' + levelDuration.toFixed(3));
+        this._msDuration = mediaSource.duration = levelDuration;
       }
     }
   }, {
@@ -6914,7 +6914,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-79';
+      return '0.6.1-80';
     }
   }, {
     key: 'Events',
