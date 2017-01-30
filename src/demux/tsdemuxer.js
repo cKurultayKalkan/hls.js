@@ -310,7 +310,7 @@
       let sample = samples[samples.length-1];
       let videoStartPTS = Math.max(this.remuxer._PTSNormalize((this.fragStartPts === undefined ? samples[0].pts : this.fragStartPts) - initDTS,this.nextAvcDts),0)/timescale;
       let videoEndPTS = Math.max(this.remuxer._PTSNormalize(sample.pts - initDTS,this.nextAvcDts),0)/timescale;
-      if (Math.abs(startDTS-this.nextAvcDts)>90) {
+      if (this.accurate && Math.abs(startDTS-this.nextAvcDts)>90) {
         videoStartPTS -= (startDTS-this.nextAvcDts)/timescale;
       }
       if ((samples.length+this.remuxAVCCount)>this.fragStartAVCPos+1 && this.fragStartDts !== undefined) {
@@ -321,7 +321,7 @@
       if (this._aacTrack.audiosamplerate) {
         let expectedSampleDuration = 1024/this._aacTrack.audiosamplerate;
         let remuxAACCount = this._aacTrack.samples.length;
-        let nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale : this.timeOffset;
+        let nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale : (this.accurate ? this.timeOffset : startPTS);
         startPTS = Math.max(startPTS, nextAacPTS+(this.fragStartAACPos-this.remuxAACCount)*expectedSampleDuration);
         if (remuxAACCount) {
           endPTS = Math.min(endPTS, nextAacPTS+expectedSampleDuration*remuxAACCount);
