@@ -1169,7 +1169,9 @@ class StreamController extends EventHandler {
         }
       } else {
         let bufferInfo = BufferHelper.bufferInfo(media,currentTime,0),
-            expectedPlaying = !(media.paused || media.ended || media.seeking || media.buffered.length === 0),
+            expectedPlaying = !(media.paused || // not playing when media is paused
+                                media.ended  || // not playing when media is ended
+                                media.buffered.length === 0), // not playing if nothing buffered
             jumpThreshold = 0.5, // tolerance needed as some browsers stalls playback before reaching buffered range end
             playheadMoving = currentTime > media.playbackRate*this.lastCurrentTime;
         if (this.stalled && playheadMoving) {
