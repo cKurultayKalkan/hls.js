@@ -1061,13 +1061,14 @@ class StreamController extends EventHandler {
 
   onFragParsed(data) {
     if (this.state === State.PARSING) {
-      var frag, level = this.levels[this.fragCurrent.level];
+      var frag = this.fragCurrent, level = this.levels[frag.level];
       this.stats.tparsed = performance.now();
       this.state = State.PARSED;
+      logger.log(`parsed frag sn:${frag.sn},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],PTSDTSshift:${data.PTSDTSshift.toFixed(3)},lastGopPTS:${data.lastGopPTS.toFixed(3)}`);
       if (data.startPTS !== undefined && data.endPTS !== undefined) {
-        var drift = LevelHelper.updateFragPTS(level.details,this.fragCurrent.sn,data.startPTS,data.endPTS,data.PTSDTSshift,data.lastGopPTS);
-        this.hls.trigger(Event.LEVEL_PTS_UPDATED, {details: level.details, level: this.fragCurrent.level, drift: drift});
-      } else if ((frag = this.fragCurrent)) {
+        var drift = LevelHelper.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
+        this.hls.trigger(Event.LEVEL_PTS_UPDATED, {details: level.details, level: frag.level, drift: drift});
+      } else {
         // forse reload of prev fragment if video samples not found
         frag.dropped = 1;
         frag.deltaPTS = this.config.maxSeekHole+1;

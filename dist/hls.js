@@ -2947,14 +2947,15 @@ var StreamController = function (_EventHandler) {
     key: 'onFragParsed',
     value: function onFragParsed(data) {
       if (this.state === State.PARSING) {
-        var frag,
-            level = this.levels[this.fragCurrent.level];
+        var frag = this.fragCurrent,
+            level = this.levels[frag.level];
         this.stats.tparsed = performance.now();
         this.state = State.PARSED;
+        _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + data.startPTS.toFixed(3) + ',' + data.endPTS.toFixed(3) + '],PTSDTSshift:' + data.PTSDTSshift.toFixed(3) + ',lastGopPTS:' + data.lastGopPTS.toFixed(3));
         if (data.startPTS !== undefined && data.endPTS !== undefined) {
-          var drift = _levelHelper2.default.updateFragPTS(level.details, this.fragCurrent.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
-          this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: level.details, level: this.fragCurrent.level, drift: drift });
-        } else if (frag = this.fragCurrent) {
+          var drift = _levelHelper2.default.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
+          this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: level.details, level: frag.level, drift: drift });
+        } else {
           // forse reload of prev fragment if video samples not found
           frag.dropped = 1;
           frag.deltaPTS = this.config.maxSeekHole + 1;
@@ -6928,7 +6929,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-84';
+      return '0.6.1-85';
     }
   }, {
     key: 'Events',
