@@ -99,6 +99,7 @@
     this.accurate = accurate;
     this._duration = duration;
     this.contiguous = false;
+    this.firstSample = first;
     if (cc !== this.lastCC) {
       logger.log('discontinuity detected');
       this.insertDiscontinuity();
@@ -122,7 +123,7 @@
     }
     if (first) {
       this.lastContiguous = sn === this.lastSN+1;
-      this.fragStats = {keyFrames: 0, dropped: 0, segment: sn, level: level};
+      this.fragStats = {keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0};
       this.remuxAVCCount = this.remuxAACCount = 0;
       this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
       this.fragStartAVCPos = this._avcTrack.samples.length;
@@ -747,6 +748,10 @@
       else {
         this.fragStats.dropped++;
       }
+      if (this.firstSample && !key) {
+        this.fragStats.notFirstKeyframe++;
+      }
+      this.firstSample = false;
     }
   }
 
