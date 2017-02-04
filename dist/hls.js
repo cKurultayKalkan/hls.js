@@ -6934,7 +6934,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-86';
+      return '0.6.1-87';
     }
   }, {
     key: 'Events',
@@ -8499,7 +8499,7 @@ var MP4Remuxer = function () {
   }, {
     key: 'insertDiscontinuity',
     value: function insertDiscontinuity() {
-      this._initPTS = this._initDTS = this.nextAacPts = this.nextAvcDts = undefined;
+      this._initPTS = this._initDTS = undefined;
     }
   }, {
     key: 'switchLevel',
