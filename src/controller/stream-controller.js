@@ -1154,7 +1154,6 @@ class StreamController extends EventHandler {
       // adjust currentTime to start position on loaded metadata
       if(!loadedmetadata && media.buffered.length && !media.seeking) {
         this.loadedmetadata = true;
-        this.nudgeRetry = 0;
         // only adjust currentTime if different from startPosition or if startPosition not buffered
         // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
         let startPosition = this.startPosition,
@@ -1180,13 +1179,12 @@ class StreamController extends EventHandler {
 
         if (playheadMoving) {
           // played moving, but was previously stalled => now not stuck anymore
-          if (this.stalled) {
-            this.stalled = undefined;
-            if (this.stallReported) {
-              logger.warn(`playback not stuck anymore @${currentTime}, after ${Math.round(performance.now()-this.stalled)}ms`);
-              this.stallReported = false;
-            }
+          if (this.stallReported) {
+            logger.warn(`playback not stuck anymore @${currentTime}, after ${Math.round(performance.now()-this.stalled)}ms`);
+            this.stallReported = false;
           }
+          this.stalled = undefined;
+          this.nudgeRetry = 0;
         } else {
           // playhead not moving
           if(expectedPlaying) {
@@ -1202,6 +1200,7 @@ class StreamController extends EventHandler {
               // if stalling for more than a given threshold, let's try to recover
               const stalledDuration = tnow - this.stalled;
               const bufferLen = bufferInfo.len;
+              let nudgeRetry = this.nudgeRetry || 0;
               // have we reached stall deadline ?
               if (bufferLen <= jumpThreshold && stalledDuration > config.lowBufferWatchdogPeriod * 1000) {
                 // report stalled error once
@@ -1216,29 +1215,35 @@ class StreamController extends EventHandler {
                 if(nextBufferStart &&
                    (delta < config.maxSeekHole) &&
                    (delta > 0)) {
-                  const nudgeRetry = this.nudgeRetry++;
+                  this.nudgeRetry = nudgeRetry++;
                   const nudgeOffset = nudgeRetry * config.nudgeOffset;
                   // next buffer is close ! adjust currentTime to nextBufferStart
                   // this will ensure effective video decoding
                   logger.log(`adjust currentTime from ${media.currentTime} to next buffered @ ${nextBufferStart} + nudge ${nudgeOffset}`);
-                  let hole = nextBufferStart + nudgeOffset - media.currentTime;
                   media.currentTime = nextBufferStart + nudgeOffset;
+                  // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;
-                  hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole : hole});
+                  hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole : nextBufferStart + nudgeOffset - currentTime});
                 }
               } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
-                logger.warn(`playback stalling in high buffer @${currentTime}`);
-                hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer : bufferLen});
+                // report stalled error once
+                if (!this.stallReported) {
+                  this.stallReported = true;
+                  logger.warn(`playback stalling in high buffer @${currentTime}`);
+                  hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer : bufferLen});
+                }
+                // reset stalled so to rearm watchdog timer
                 this.stalled = undefined;
-                const nudgeRetry = this.nudgeRetry++;
+                this.nudgeRetry = nudgeRetry++;
                 if (nudgeRetry < config.nudgeMaxRetry) {
                   const currentTime = media.currentTime;
-                  const targetTime = currentTime + (nudgeRetry + 1) * config.nudgeOffset;
+                  const targetTime = currentTime + nudgeRetry * config.nudgeOffset;
                   logger.log(`adjust currentTime from ${currentTime} to ${targetTime}`);
                   // playback stalled in buffered area ... let's nudge currentTime to try to overcome this
                   media.currentTime = targetTime;
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_NUDGE_ON_STALL, fatal: false});
                 } else {
+                  logger.error(`still stuck in high buffer @${currentTime} after ${config.nudgeMaxRetry}, raise fatal error`);
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: true});
                 }
               }
