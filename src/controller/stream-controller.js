@@ -1064,7 +1064,7 @@ class StreamController extends EventHandler {
       var frag = this.fragCurrent, level = this.levels[frag.level];
       this.stats.tparsed = performance.now();
       this.state = State.PARSED;
-      logger.log(`parsed frag sn:${frag.sn},PTS:[${data.startPTS.toFixed(3)},${data.endPTS.toFixed(3)}],PTSDTSshift:${data.PTSDTSshift.toFixed(3)},lastGopPTS:${data.lastGopPTS.toFixed(3)}`);
+      logger.log(`parsed frag sn:${frag.sn},PTS:[${data.startPTS ? data.startPTS.toFixed(3) : 'none'},${data.endPTS ? data.endPTS.toFixed(3) : 'none'}],PTSDTSshift:${data.PTSDTSshift ? data.PTSDTSshift.toFixed(3) : 'none'},lastGopPTS:${data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'}`);
       if (data.startPTS !== undefined && data.endPTS !== undefined) {
         var drift = LevelHelper.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
         this.hls.trigger(Event.LEVEL_PTS_UPDATED, {details: level.details, level: frag.level, drift: drift});

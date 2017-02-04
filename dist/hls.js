@@ -2951,7 +2951,7 @@ var StreamController = function (_EventHandler) {
             level = this.levels[frag.level];
         this.stats.tparsed = performance.now();
         this.state = State.PARSED;
-        _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + data.startPTS.toFixed(3) + ',' + data.endPTS.toFixed(3) + '],PTSDTSshift:' + data.PTSDTSshift.toFixed(3) + ',lastGopPTS:' + data.lastGopPTS.toFixed(3));
+        _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + (data.startPTS ? data.startPTS.toFixed(3) : 'none') + ',' + (data.endPTS ? data.endPTS.toFixed(3) : 'none') + '],PTSDTSshift:' + (data.PTSDTSshift ? data.PTSDTSshift.toFixed(3) : 'none') + ',lastGopPTS:' + (data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'));
         if (data.startPTS !== undefined && data.endPTS !== undefined) {
           var drift = _levelHelper2.default.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
           this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: level.details, level: frag.level, drift: drift });
@@ -6934,7 +6934,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-87';
+      return '0.6.1-88';
     }
   }, {
     key: 'Events',
