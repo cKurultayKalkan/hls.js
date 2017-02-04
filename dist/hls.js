@@ -3067,42 +3067,78 @@ var StreamController = function (_EventHandler) {
               // not playing if nothing buffered
           jumpThreshold = 0.5,
               // tolerance needed as some browsers stalls playback before reaching buffered range end
-          playheadMoving = currentTime > media.playbackRate * this.lastCurrentTime;
-          if (this.stalled && playheadMoving) {
-            this.stalled = false;
-            _logger.logger.log('playback not stuck anymore @' + currentTime);
-          }
-          // check buffer upfront
-          // if less than jumpThreshold second is buffered, and media is expected to play but playhead is not moving,
-          // and we have a new buffer range available upfront, let's seek to that one
-          if (expectedPlaying && bufferInfo.len <= jumpThreshold) {
-            if (playheadMoving) {
-              // playhead moving
-              jumpThreshold = 0;
-              this.seekHoleNudgeDuration = 0;
-            } else {
-              // playhead not moving AND media expected to play
-              if (!this.stalled) {
-                this.seekHoleNudgeDuration = 0;
-                _logger.logger.log('playback seems stuck @' + currentTime);
-                this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false });
-                this.stalled = true;
-              } else {
-                this.seekHoleNudgeDuration += this.config.seekHoleNudgeDuration;
-              }
+          playheadMoving = currentTime > media.playbackRate * this.lastCurrentTime,
+              config = this.config;
+
+          if (playheadMoving) {
+            // played moving, but was previously stalled => now not stuck anymore
+            if (this.stallReported) {
+              _logger.logger.warn('playback not stuck anymore @' + currentTime + ', after ' + Math.round(performance.now() - this.stalled) + 'ms');
+              this.stallReported = false;
             }
-            // if we are below threshold, try to jump if next buffer range is close
-            if (bufferInfo.len <= jumpThreshold) {
-              // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
-              var nextBufferStart = bufferInfo.nextStart,
-                  delta = nextBufferStart - currentTime;
-              if (nextBufferStart && delta < this.config.maxSeekHole && delta > 0) {
-                // next buffer is close ! adjust currentTime to nextBufferStart
-                // this will ensure effective video decoding
-                _logger.logger.log('adjust currentTime from ' + media.currentTime + ' to next buffered @ ' + nextBufferStart + ' + nudge ' + this.seekHoleNudgeDuration);
-                var hole = nextBufferStart + this.seekHoleNudgeDuration - media.currentTime;
-                media.currentTime = nextBufferStart + this.seekHoleNudgeDuration;
-                this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole: hole });
+            this.stalled = undefined;
+            this.nudgeRetry = 0;
+          } else {
+            // playhead not moving
+            if (expectedPlaying) {
+              // playhead not moving BUT media expected to play
+              var tnow = performance.now();
+              var hls = this.hls;
+              if (!this.stalled) {
+                // stall just detected, store current time
+                this.stalled = tnow;
+                this.stallReported = false;
+              } else {
+                // playback already stalled, check stalling duration
+                // if stalling for more than a given threshold, let's try to recover
+                var stalledDuration = tnow - this.stalled;
+                var bufferLen = bufferInfo.len;
+                var nudgeRetry = this.nudgeRetry || 0;
+                // have we reached stall deadline ?
+                if (bufferLen <= jumpThreshold && stalledDuration > config.lowBufferWatchdogPeriod * 1000) {
+                  // report stalled error once
+                  if (!this.stallReported) {
+                    this.stallReported = true;
+                    _logger.logger.warn('playback stalling in low buffer @' + currentTime);
+                    hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer: bufferLen });
+                  }
+                  // if buffer len is below threshold, try to jump to start of next buffer range if close
+                  // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
+                  var nextBufferStart = bufferInfo.nextStart,
+                      delta = nextBufferStart - currentTime;
+                  if (nextBufferStart && delta < config.maxSeekHole && delta > 0) {
+                    this.nudgeRetry = ++nudgeRetry;
+                    var nudgeOffset = nudgeRetry * config.nudgeOffset;
+                    // next buffer is close ! adjust currentTime to nextBufferStart
+                    // this will ensure effective video decoding
+                    _logger.logger.log('adjust currentTime from ' + media.currentTime + ' to next buffered @ ' + nextBufferStart + ' + nudge ' + nudgeOffset);
+                    media.currentTime = nextBufferStart + nudgeOffset;
+                    // reset stalled so to rearm watchdog timer
+                    this.stalled = undefined;
+                    hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole: nextBufferStart + nudgeOffset - currentTime });
+                  }
+                } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
+                  // report stalled error once
+                  if (!this.stallReported) {
+                    this.stallReported = true;
+                    _logger.logger.warn('playback stalling in high buffer @' + currentTime);
+                    hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer: bufferLen });
+                  }
+                  // reset stalled so to rearm watchdog timer
+                  this.stalled = undefined;
+                  this.nudgeRetry = ++nudgeRetry;
+                  if (nudgeRetry < config.nudgeMaxRetry) {
+                    var _currentTime = media.currentTime;
+                    var targetTime = _currentTime + nudgeRetry * config.nudgeOffset;
+                    _logger.logger.log('adjust currentTime from ' + _currentTime + ' to ' + targetTime);
+                    // playback stalled in buffered area ... let's nudge currentTime to try to overcome this
+                    media.currentTime = targetTime;
+                    hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_NUDGE_ON_STALL, fatal: false });
+                  } else {
+                    _logger.logger.error('still stuck in high buffer @' + currentTime + ' after ' + config.nudgeMaxRetry + ', raise fatal error');
+                    hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: true });
+                  }
+                }
               }
             }
           }
@@ -6268,6 +6304,8 @@ var ErrorDetails = exports.ErrorDetails = {
   BUFFER_FULL_ERROR: 'bufferFullError',
   // Identifier for a buffer seek over hole event
   BUFFER_SEEK_OVER_HOLE: 'bufferSeekOverHole',
+  // Identifier for a buffer nudge on stall (playback is stuck although currentTime is in a buffered area)
+  BUFFER_NUDGE_ON_STALL: 'bufferNudgeOnStall',
   // Identifier for an internal exception happening inside hls.js while handling an event
   INTERNAL_EXCEPTION: 'internalException'
 };
@@ -6934,7 +6972,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-88';
+      return '0.6.1-89';
     }
   }, {
     key: 'Events',
@@ -6964,8 +7002,10 @@ var Hls = function () {
           maxBufferSize: 60 * 1000 * 1000,
           maxBufferHole: 0.5,
           maxSeekHole: 2,
-          seekHoleNudgeDuration: 0.01,
-          stalledInBufferedNudgeThreshold: 10,
+          lowBufferWatchdogPeriod: 0,
+          highBufferWatchdogPeriod: 3,
+          nudgeOffset: 0.1,
+          nudgeMaxRetry: 3,
           maxFragLookUpTolerance: 0.2,
           liveSyncDurationCount: 3,
           liveMaxLatencyDurationCount: Infinity,
