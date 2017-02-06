@@ -83,5 +83,7 @@ module.exports = {
   KEY_LOADED: 'hlsKeyLoaded',
   // fired upon stream controller state transitions - data: {previousState, nextState}
   STREAM_STATE_TRANSITION: 'hlsStreamStateTransition',
-  DEMUXER_QUEUE_EMPTY: 'hlsDemuxerQueueEmpty'
+  DEMUXER_QUEUE_EMPTY: 'hlsDemuxerQueueEmpty',
+  // fired when playback is stalled on low/high buffer
+  BUF_STATISTICS: 'hlsBufStatistics'
 };

@@ -1169,6 +1169,7 @@ class StreamController extends EventHandler {
           media.currentTime = startPosition;
         }
       } else {
+        const hls = this.hls;
         let bufferInfo = BufferHelper.bufferInfo(media,currentTime,0),
             expectedPlaying = !(media.paused || // not playing when media is paused
                                 media.ended  || // not playing when media is ended
@@ -1182,6 +1183,7 @@ class StreamController extends EventHandler {
           if (this.stallReported) {
             logger.warn(`playback not stuck anymore @${currentTime}, after ${Math.round(performance.now()-this.stalled)}ms`);
             this.stallReported = false;
+            hls.trigger(Event.BUF_STATISTICS, {bufNotStalled: 1});
           }
           this.stalled = undefined;
           this.nudgeRetry = 0;
@@ -1190,7 +1192,6 @@ class StreamController extends EventHandler {
           if(expectedPlaying) {
             // playhead not moving BUT media expected to play
             const tnow = performance.now();
-            const hls = this.hls;
             if(!this.stalled) {
               // stall just detected, store current time
               this.stalled = tnow;
@@ -1208,6 +1209,7 @@ class StreamController extends EventHandler {
                   this.stallReported = true;
                   logger.warn(`playback stalling in low buffer @${currentTime}`);
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer : bufferLen});
+                  hls.trigger(Event.BUF_STATISTICS, {bufStalledLow: 1});
                 }
                 // if buffer len is below threshold, try to jump to start of next buffer range if close
                 // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
@@ -1224,6 +1226,7 @@ class StreamController extends EventHandler {
                   // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole : nextBufferStart + nudgeOffset - currentTime});
+                  hls.trigger(Event.BUF_STATISTICS, {bufSeekOverHole: 1});
                 }
               } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
                 // report stalled error once
@@ -1231,6 +1234,7 @@ class StreamController extends EventHandler {
                   this.stallReported = true;
                   logger.warn(`playback stalling in high buffer @${currentTime}`);
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer : bufferLen});
+                  hls.trigger(Event.BUF_STATISTICS, {bufStalledHigh: 1});
                 }
                 // reset stalled so to rearm watchdog timer
                 this.stalled = undefined;
@@ -1242,6 +1246,7 @@ class StreamController extends EventHandler {
                   // playback stalled in buffered area ... let's nudge currentTime to try to overcome this
                   media.currentTime = targetTime;
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_NUDGE_ON_STALL, fatal: false});
+                  hls.trigger(Event.BUF_STATISTICS, {bufNudge: 1});
                 } else {
                   logger.error(`still stuck in high buffer @${currentTime} after ${config.nudgeMaxRetry}, raise fatal error`);
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: true});

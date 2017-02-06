@@ -3060,6 +3060,7 @@ var StreamController = function (_EventHandler) {
             media.currentTime = startPosition;
           }
         } else {
+          var hls = this.hls;
           var bufferInfo = _bufferHelper2.default.bufferInfo(media, currentTime, 0),
               expectedPlaying = !(media.paused || // not playing when media is paused
           media.ended || // not playing when media is ended
@@ -3075,6 +3076,7 @@ var StreamController = function (_EventHandler) {
             if (this.stallReported) {
               _logger.logger.warn('playback not stuck anymore @' + currentTime + ', after ' + Math.round(performance.now() - this.stalled) + 'ms');
               this.stallReported = false;
+              hls.trigger(_events2.default.BUF_STATISTICS, { bufNotStalled: 1 });
             }
             this.stalled = undefined;
             this.nudgeRetry = 0;
@@ -3083,7 +3085,6 @@ var StreamController = function (_EventHandler) {
             if (expectedPlaying) {
               // playhead not moving BUT media expected to play
               var tnow = performance.now();
-              var hls = this.hls;
               if (!this.stalled) {
                 // stall just detected, store current time
                 this.stalled = tnow;
@@ -3101,6 +3102,7 @@ var StreamController = function (_EventHandler) {
                     this.stallReported = true;
                     _logger.logger.warn('playback stalling in low buffer @' + currentTime);
                     hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer: bufferLen });
+                    hls.trigger(_events2.default.BUF_STATISTICS, { bufStalledLow: 1 });
                   }
                   // if buffer len is below threshold, try to jump to start of next buffer range if close
                   // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
@@ -3116,6 +3118,7 @@ var StreamController = function (_EventHandler) {
                     // reset stalled so to rearm watchdog timer
                     this.stalled = undefined;
                     hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole: nextBufferStart + nudgeOffset - currentTime });
+                    hls.trigger(_events2.default.BUF_STATISTICS, { bufSeekOverHole: 1 });
                   }
                 } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
                   // report stalled error once
@@ -3123,6 +3126,7 @@ var StreamController = function (_EventHandler) {
                     this.stallReported = true;
                     _logger.logger.warn('playback stalling in high buffer @' + currentTime);
                     hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer: bufferLen });
+                    hls.trigger(_events2.default.BUF_STATISTICS, { bufStalledHigh: 1 });
                   }
                   // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;
@@ -3134,6 +3138,7 @@ var StreamController = function (_EventHandler) {
                     // playback stalled in buffered area ... let's nudge currentTime to try to overcome this
                     media.currentTime = targetTime;
                     hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_NUDGE_ON_STALL, fatal: false });
+                    hls.trigger(_events2.default.BUF_STATISTICS, { bufNudge: 1 });
                   } else {
                     _logger.logger.error('still stuck in high buffer @' + currentTime + ' after ' + config.nudgeMaxRetry + ', raise fatal error');
                     hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_STALLED_ERROR, fatal: true });
@@ -6507,7 +6512,9 @@ module.exports = {
   KEY_LOADED: 'hlsKeyLoaded',
   // fired upon stream controller state transitions - data: {previousState, nextState}
   STREAM_STATE_TRANSITION: 'hlsStreamStateTransition',
-  DEMUXER_QUEUE_EMPTY: 'hlsDemuxerQueueEmpty'
+  DEMUXER_QUEUE_EMPTY: 'hlsDemuxerQueueEmpty',
+  // fired when playback is stalled on low/high buffer
+  BUF_STATISTICS: 'hlsBufStatistics'
 };
 
 },{}],24:[function(_dereq_,module,exports){
@@ -6972,7 +6979,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-90';
+      return '0.6.1-91';
     }
   }, {
     key: 'Events',
