@@ -57,7 +57,7 @@ class Hls {
           lowBufferWatchdogPeriod: 0,
           highBufferWatchdogPeriod: 3,
           nudgeOffset: 0.1,
-          nudgeMaxRetry : 3,
+          nudgeMaxRetry : 5,
           maxFragLookUpTolerance : 0.2,
           liveSyncDurationCount:3,
           liveMaxLatencyDurationCount: Infinity,
