@@ -5542,7 +5542,9 @@ var TSDemuxer = function () {
           videoStartPTS -= (startDTS - this.nextAvcDts) / timescale;
         }
         if (samples.length + this.remuxAVCCount > this.fragStartAVCPos + 1 && this.fragStartDts !== undefined) {
-          videoEndPTS += (sample.dts - this.fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
+          var fragStartDts = this.remuxer._PTSNormalize(this.fragStartDts, this.nextAvcDts);
+          var sampleDts = this.remuxer._PTSNormalize(sample.dts, this.nextAvcDts);
+          videoEndPTS += (sampleDts - fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
         }
         startPTS = videoStartPTS;
         endPTS = videoEndPTS;
@@ -6985,7 +6987,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-92';
+      return '0.6.1-93';
     }
   }, {
     key: 'Events',
