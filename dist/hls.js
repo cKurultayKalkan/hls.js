@@ -4351,7 +4351,22 @@ var DemuxerInline = function () {
         } else if (_aacdemuxer2.default.probe(data)) {
           demuxer = new _aacdemuxer2.default(hls, _mp4Remuxer2.default, this.config);
         } else {
-          hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found' });
+          var i = void 0,
+              len = data.length,
+              info = 'len:' + len + ' [';
+          for (i = 0, len = Math.min(len, 10); i < len; i++) {
+            if (i) {
+              info += ',';
+            }
+            info += data[i];
+          }
+          info += '..]';
+          if (data.length >= 3 * 188) {
+            info += ' [0]==' + data[0] + ' [188]==' + data[188] + ' [2*188]==' + data[2 * 188];
+          }
+
+          hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.FRAG_PARSING_ERROR, fatal: true,
+            reason: 'no demux matching with content found ' + info });
           return;
         }
         this.demuxer = demuxer;
@@ -6988,7 +7003,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-95';
+      return '0.6.1-96';
     }
   }, {
     key: 'Events',

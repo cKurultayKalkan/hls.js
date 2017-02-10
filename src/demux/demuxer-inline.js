@@ -48,7 +48,20 @@ class DemuxerInline {
       } else if(AACDemuxer.probe(data)) {
         demuxer = new AACDemuxer(hls, MP4Remuxer, this.config);
       } else {
-        hls.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true, reason: 'no demux matching with content found'});
+        let i, len = data.length, info = `len:${len} [`;
+        for (i = 0, len = Math.min(len, 10); i<len; i++) {
+          if (i) {
+            info += ',';
+          }
+          info += data[i];
+        }
+        info += '..]';
+        if (data.length >= 3*188) {
+          info += ' [0]==' + data[0] + ' [188]==' + data[188] + ' [2*188]==' + data[2*188];
+        }
+
+        hls.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: true,
+          reason: 'no demux matching with content found ' + info});
         return;
       }
       this.demuxer = demuxer;
