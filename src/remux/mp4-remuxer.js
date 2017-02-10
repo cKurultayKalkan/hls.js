@@ -359,13 +359,8 @@ class MP4Remuxer {
         firstPTS, firstDTS, lastDTS,
         pts, dts, ptsnorm, dtsnorm,
         samples = [],
-        samples0 = [],
+        samples0 = track.samples,
         fillFrame, newStamp;
-
-    track.samples.sort(function(a, b) {
-      return (a.pts-b.pts);
-    });
-    samples0 = track.samples;
 
     // for audio samples, also consider consecutive fragments as being contiguous (even if a level switch occurs),
     // for sake of clarity:
@@ -385,12 +380,19 @@ class MP4Remuxer {
     let pesFrameDuration = expectedSampleDuration * pes2mp4ScaleFactor;
     let nextPtsNorm = nextAacPts;
 
+    for (let i = 0; i < samples0.length; i++) {
+      samples0[i].ptsNorm = this._PTSNormalize(samples0[i].pts - this._initDTS, nextAacPts);
+    }
+    samples0.sort(function(a, b) {
+      return (a.ptsNorm-b.ptsNorm);
+    });
+
     // only inject/drop audio frames in case time offset is accurate
     if (accurate) {
       for (let i = 0; i < samples0.length; ) {
         // First, let's see how far off this frame is from where we expect it to be
         var sample = samples0[i],
-          ptsNorm = this._PTSNormalize(sample.pts - this._initDTS, nextAacPts),
+          ptsNorm = sample.ptsNorm,
           delta = ptsNorm - nextPtsNorm;
 
         if (Math.abs(delta)>pesFrameDuration/2) {

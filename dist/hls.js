@@ -6988,7 +6988,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-94';
+      return '0.6.1-95';
     }
   }, {
     key: 'Events',
@@ -8907,14 +8907,9 @@ var MP4Remuxer = function () {
           ptsnorm,
           dtsnorm,
           samples = [],
-          samples0 = [],
+          samples0 = track.samples,
           fillFrame,
           newStamp;
-
-      track.samples.sort(function (a, b) {
-        return a.pts - b.pts;
-      });
-      samples0 = track.samples;
 
       // for audio samples, also consider consecutive fragments as being contiguous (even if a level switch occurs),
       // for sake of clarity:
@@ -8934,12 +8929,19 @@ var MP4Remuxer = function () {
       var pesFrameDuration = expectedSampleDuration * pes2mp4ScaleFactor;
       var nextPtsNorm = nextAacPts;
 
+      for (var i = 0; i < samples0.length; i++) {
+        samples0[i].ptsNorm = this._PTSNormalize(samples0[i].pts - this._initDTS, nextAacPts);
+      }
+      samples0.sort(function (a, b) {
+        return a.ptsNorm - b.ptsNorm;
+      });
+
       // only inject/drop audio frames in case time offset is accurate
       if (accurate) {
-        for (var i = 0; i < samples0.length;) {
+        for (var _i3 = 0; _i3 < samples0.length;) {
           // First, let's see how far off this frame is from where we expect it to be
-          var sample = samples0[i],
-              ptsNorm = this._PTSNormalize(sample.pts - this._initDTS, nextAacPts),
+          var sample = samples0[_i3],
+              ptsNorm = sample.ptsNorm,
               delta = ptsNorm - nextPtsNorm;
 
           if (Math.abs(delta) > pesFrameDuration / 2) {
@@ -8950,7 +8952,7 @@ var MP4Remuxer = function () {
           // If we're overlapping by more than a duration, drop this sample
           if (delta < -pesFrameDuration) {
             _logger.logger.log('Dropping frame due to ' + Math.abs(delta / 90) + ' ms overlap.');
-            samples0.splice(i, 1);
+            samples0.splice(_i3, 1);
             track.len -= sample.unit.length;
             // Don't touch nextPtsNorm or i
           }
@@ -8966,26 +8968,26 @@ var MP4Remuxer = function () {
                   _logger.logger.log('Unable to get silent frame for given audio codec; duplicating last frame instead.');
                   fillFrame = sample.unit.slice(0);
                 }
-                samples0.splice(i, 0, { unit: fillFrame, pts: newStamp, dts: newStamp });
+                samples0.splice(_i3, 0, { unit: fillFrame, pts: newStamp, dts: newStamp });
                 track.len += fillFrame.length;
                 nextPtsNorm += pesFrameDuration;
-                i += 1;
+                _i3 += 1;
               }
 
               // Adjust sample to next expected pts
               sample.pts = sample.dts = nextPtsNorm + this._initDTS;
               nextPtsNorm += pesFrameDuration;
-              i += 1;
+              _i3 += 1;
             }
             // Otherwise, we're within half a frame duration, so just adjust pts
             else {
                 nextPtsNorm += pesFrameDuration;
-                if (i === 0) {
+                if (_i3 === 0) {
                   sample.pts = sample.dts = this._initDTS + nextAacPts;
                 } else {
-                  sample.pts = sample.dts = samples0[i - 1].pts + pesFrameDuration;
+                  sample.pts = sample.dts = samples0[_i3 - 1].pts + pesFrameDuration;
                 }
-                i += 1;
+                _i3 += 1;
               }
         }
       }
@@ -9040,8 +9042,8 @@ var MP4Remuxer = function () {
           view = new DataView(mdat.buffer);
           view.setUint32(0, mdat.byteLength);
           mdat.set(_mp4Generator2.default.types.mdat, 4);
-          for (var _i3 = 0; _i3 < numMissingFrames; _i3++) {
-            newStamp = ptsnorm - (numMissingFrames - _i3) * pesFrameDuration;
+          for (var _i4 = 0; _i4 < numMissingFrames; _i4++) {
+            newStamp = ptsnorm - (numMissingFrames - _i4) * pesFrameDuration;
             fillFrame = _aac2.default.getSilentFrame(track.channelCount);
             if (!fillFrame) {
               _logger.logger.log('Unable to get silent frame for given audio codec; duplicating this frame instead.');
