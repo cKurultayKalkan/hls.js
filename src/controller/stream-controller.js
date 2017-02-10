@@ -1181,9 +1181,10 @@ class StreamController extends EventHandler {
         if (playheadMoving) {
           // played moving, but was previously stalled => now not stuck anymore
           if (this.stallReported) {
-            logger.warn(`playback not stuck anymore @${currentTime}, after ${Math.round(performance.now()-this.stalled)}ms`);
-            this.stallLowBuff = this.stallReported = false;
-            hls.trigger(Event.BUF_STATISTICS, {bufNotStalled: 1});
+            let dur = Math.round(performance.now()-this.stalled);
+            logger.warn(`playback not stuck anymore @${currentTime}, after ${dur}ms`);
+            hls.trigger(Event.BUF_STATISTICS, {bufNotStalled: {ts: currentTime, dur: dur, lowBuf: this.stallLowBuf}});
+            this.stallLowBuf = this.stallReported = false;
           }
           this.stalled = undefined;
           this.nudgeRetry = 0;
@@ -1195,7 +1196,7 @@ class StreamController extends EventHandler {
             if(!this.stalled) {
               // stall just detected, store current time
               this.stalled = tnow;
-              this.stallLowBuff = this.stallReported = false;
+              this.stallLowBuf = this.stallReported = false;
             } else {
               // playback already stalled, check stalling duration
               // if stalling for more than a given threshold, let's try to recover
@@ -1207,10 +1208,10 @@ class StreamController extends EventHandler {
                 // report stalled error once
                 if (!this.stallReported) {
                   this.stallReported = true;
-                  this.stallLowBuff = true;
+                  this.stallLowBuf = true;
                   logger.warn(`playback stalling in low buffer @${currentTime}`);
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer : bufferLen});
-                  hls.trigger(Event.BUF_STATISTICS, {bufStalledLow: 1});
+                  hls.trigger(Event.BUF_STATISTICS, {bufStalledLow: {ts: currentTime}});
                 }
                 // if buffer len is below threshold, try to jump to start of next buffer range if close
                 // no buffer available @ currentTime, check if next buffer is close (within a config.maxSeekHole second range)
@@ -1227,10 +1228,10 @@ class StreamController extends EventHandler {
                   // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole : nextBufferStart + nudgeOffset - currentTime});
-                  hls.trigger(Event.BUF_STATISTICS, {bufSeekOverHole: 1});
+                  hls.trigger(Event.BUF_STATISTICS, {bufSeekOverHole: {ts: currentTime}});
                 }
               } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
-                if (this.stallReported && this.stallLowBuff) {
+                if (this.stallReported && this.stallLowBuf) {
                   // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;
                 } else {
@@ -1239,7 +1240,7 @@ class StreamController extends EventHandler {
                     this.stallReported = true;
                     logger.warn(`playback stalling in high buffer @${currentTime}`);
                     hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: false, buffer : bufferLen});
-                    hls.trigger(Event.BUF_STATISTICS, {bufStalledHigh: 1});
+                    hls.trigger(Event.BUF_STATISTICS, {bufStalledHigh: {ts: currentTime}});
                   }
                   // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;
@@ -1251,7 +1252,7 @@ class StreamController extends EventHandler {
                     // playback stalled in buffered area ... let's nudge currentTime to try to overcome this
                     media.currentTime = targetTime;
                     hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_NUDGE_ON_STALL, fatal: false});
-                    hls.trigger(Event.BUF_STATISTICS, {bufNudge: 1});
+                    hls.trigger(Event.BUF_STATISTICS, {bufNudge: {ts: currentTime}});
                   } else {
                     logger.error(`still stuck in high buffer @${currentTime} after ${config.nudgeMaxRetry}, raise fatal error`);
                     hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_STALLED_ERROR, fatal: true});
