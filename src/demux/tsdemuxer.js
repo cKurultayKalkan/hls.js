@@ -234,7 +234,15 @@
             break;
         }
       } else {
-        this.observer.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47'});
+        let i, len = data.length, info = `len:${len} [`;
+        for (i = 0, len = Math.min(len, 10); i<len; i++) {
+          if (i) {
+            info += ',';
+          }
+          info += data[start+i];
+        }
+        info += '..]';
+        this.observer.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47 '+info});
       }
     }
     // parse last PES packet
