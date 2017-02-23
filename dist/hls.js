@@ -1522,13 +1522,11 @@ var LevelController = function (_EventHandler) {
       this._manualLevel = -1;
     }
   }, {
-    key: 'startLoad',
-    value: function startLoad() {
-      this.canload = true;
-      var levels = this._levels;
+    key: 'clearLevelDetails',
+    value: function clearLevelDetails() {
       // clean up live level details to force reload them, and reset load errors
-      if (levels) {
-        levels.forEach(function (level) {
+      if (this._levels) {
+        this._levels.forEach(function (level) {
           level.loadError = 0;
           var levelDetails = level.details;
           if (levelDetails && levelDetails.live) {
@@ -1536,6 +1534,11 @@ var LevelController = function (_EventHandler) {
           }
         });
       }
+    }
+  }, {
+    key: 'startLoad',
+    value: function startLoad() {
+      this.canload = true;
       // speed up live playlist refresh if timer exists
       if (this.timer) {
         this.tick();
@@ -2723,14 +2726,11 @@ var StreamController = function (_EventHandler) {
       if (newDetails.live) {
         var curDetails = curLevel.details;
 
-        if (lastDetails) {
-          var _LevelHelper$probeDet = _levelHelper2.default.probeDetails(lastDetails, newDetails),
-              start = _LevelHelper$probeDet.start,
-              end = _LevelHelper$probeDet.end;
-
-          if (end >= start) {
-            curDetails = lastDetails;
-          }
+        if (lastDetails && _levelHelper2.default.canMerge(lastDetails, newDetails)) {
+          curDetails = lastDetails;
+        } else if (curDetails && !_levelHelper2.default.canMerge(curDetails, newDetails)) {
+          curDetails = undefined;
+          this.hls.clearLevelDetails();
         }
 
         if (curDetails) {
@@ -6733,6 +6733,15 @@ var LevelHelper = function () {
   }
 
   _createClass(LevelHelper, null, [{
+    key: 'canMerge',
+    value: function canMerge(oldDetails, newDetails) {
+      var _LevelHelper$probeDet = LevelHelper.probeDetails(oldDetails, newDetails),
+          start = _LevelHelper$probeDet.start,
+          end = _LevelHelper$probeDet.end;
+
+      return end >= start;
+    }
+  }, {
     key: 'probeDetails',
     value: function probeDetails(oldDetails, newDetails) {
       function getTimes(details) {
@@ -6785,10 +6794,10 @@ var LevelHelper = function () {
           ccOffset = 0,
           PTSFrag;
 
-      var _LevelHelper$probeDet = LevelHelper.probeDetails(oldDetails, newDetails),
-          start = _LevelHelper$probeDet.start,
-          end = _LevelHelper$probeDet.end,
-          delta = _LevelHelper$probeDet.delta;
+      var _LevelHelper$probeDet2 = LevelHelper.probeDetails(oldDetails, newDetails),
+          start = _LevelHelper$probeDet2.start,
+          end = _LevelHelper$probeDet2.end,
+          delta = _LevelHelper$probeDet2.delta;
 
       // check if old/new playlists have fragments in common
 
@@ -7013,7 +7022,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-97';
+      return '0.6.1-98';
     }
   }, {
     key: 'Events',
@@ -7215,6 +7224,12 @@ var Hls = function () {
       _logger.logger.log('stopLoad');
       this.levelController.stopLoad();
       this.streamController.stopLoad();
+    }
+  }, {
+    key: 'clearLevelDetails',
+    value: function clearLevelDetails() {
+      _logger.logger.log('clearing level details');
+      this.levelController.clearLevelDetails();
     }
   }, {
     key: 'swapAudioCodec',
@@ -8659,13 +8674,15 @@ var MP4Remuxer = function () {
         // in order to avoid overflowing the 32 bit counter for large duration, we use smaller timescale (timescale/gcd)
         // we just need to ensure that AAC sample duration will still be an integer (will be 1024/gcd)
         if (audioTrack.timescale * audioTrack.duration > Math.pow(2, 32)) {
-          var greatestCommonDivisor = function greatestCommonDivisor(a, b) {
-            if (!b) {
-              return a;
-            }
-            return greatestCommonDivisor(b, a % b);
-          };
-          audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate, 1024);
+          (function () {
+            var greatestCommonDivisor = function greatestCommonDivisor(a, b) {
+              if (!b) {
+                return a;
+              }
+              return greatestCommonDivisor(b, a % b);
+            };
+            audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate, 1024);
+          })();
         }
         _logger.logger.log('audio mp4 timescale :' + audioTrack.timescale);
         tracks.audio = {

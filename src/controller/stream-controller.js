@@ -846,11 +846,11 @@ class StreamController extends EventHandler {
     if (newDetails.live) {
       var curDetails = curLevel.details;
 
-      if (lastDetails) {
-        let {start, end} = LevelHelper.probeDetails(lastDetails, newDetails);
-        if (end >= start) {
-          curDetails = lastDetails;
-        }
+      if (lastDetails && LevelHelper.canMerge(lastDetails, newDetails)) {
+        curDetails = lastDetails;
+      } else if (curDetails && !LevelHelper.canMerge(curDetails, newDetails)) {
+        curDetails = undefined;
+        this.hls.clearLevelDetails();
       }
 
       if (curDetails) {

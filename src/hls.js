@@ -205,6 +205,11 @@ class Hls {
     this.streamController.stopLoad();
   }
 
+  clearLevelDetails() {
+    logger.log('clearing level details');
+    this.levelController.clearLevelDetails();
+  }
+
   swapAudioCodec() {
     logger.log('swapAudioCodec');
     this.streamController.swapAudioCodec();

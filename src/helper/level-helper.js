@@ -6,6 +6,11 @@ import {logger} from '../utils/logger';
 
 class LevelHelper {
 
+  static canMerge(oldDetails, newDetails) {
+    let {start, end} = LevelHelper.probeDetails(oldDetails, newDetails);
+    return end>=start;
+  }
+
   static probeDetails(oldDetails, newDetails) {
     function getTimes(details) {
       let startTS = 0, endTS = 0, i = 0;

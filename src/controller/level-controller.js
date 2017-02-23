@@ -26,12 +26,10 @@ class LevelController extends EventHandler {
     this._manualLevel = -1;
   }
 
-  startLoad() {
-    this.canload = true;
-    let levels = this._levels;
+  clearLevelDetails() {
     // clean up live level details to force reload them, and reset load errors
-    if(levels) {
-      levels.forEach(level => {
+    if(this._levels) {
+      this._levels.forEach(level => {
         level.loadError = 0;
         const levelDetails = level.details;
         if (levelDetails && levelDetails.live) {
@@ -39,6 +37,10 @@ class LevelController extends EventHandler {
         }
       });
     }
+  }
+
+  startLoad() {
+    this.canload = true;
     // speed up live playlist refresh if timer exists
     if (this.timer) {
       this.tick();
