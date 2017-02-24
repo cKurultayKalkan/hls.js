@@ -7019,10 +7019,22 @@ var Hls = function () {
       return window.MediaSource && window.MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E,mp4a.40.2"');
     }
   }, {
+    key: 'isIe',
+    value: function isIe() {
+      var res = void 0,
+          ua = typeof window !== 'undefined' && window.navigator && navigator.userAgent;
+      if (res = /[( ]MSIE ([6789]|10).\d[);]/.exec(ua)) {
+        return { browser: 'ie', version: res[1] };
+      }
+      if (res = /[( ]Trident\/\d+(\.\d)+.*rv:(\d\d)(\.\d)+[);]/.exec(ua)) {
+        return { browser: 'ie', version: res[2] };
+      }
+    }
+  }, {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-98';
+      return '0.6.1-99';
     }
   }, {
     key: 'Events',
@@ -7062,7 +7074,7 @@ var Hls = function () {
           liveSyncDuration: undefined,
           liveMaxLatencyDuration: undefined,
           maxMaxBufferLength: 40,
-          enableWorker: true,
+          enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
@@ -8674,15 +8686,13 @@ var MP4Remuxer = function () {
         // in order to avoid overflowing the 32 bit counter for large duration, we use smaller timescale (timescale/gcd)
         // we just need to ensure that AAC sample duration will still be an integer (will be 1024/gcd)
         if (audioTrack.timescale * audioTrack.duration > Math.pow(2, 32)) {
-          (function () {
-            var greatestCommonDivisor = function greatestCommonDivisor(a, b) {
-              if (!b) {
-                return a;
-              }
-              return greatestCommonDivisor(b, a % b);
-            };
-            audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate, 1024);
-          })();
+          var greatestCommonDivisor = function greatestCommonDivisor(a, b) {
+            if (!b) {
+              return a;
+            }
+            return greatestCommonDivisor(b, a % b);
+          };
+          audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate, 1024);
         }
         _logger.logger.log('audio mp4 timescale :' + audioTrack.timescale);
         tracks.audio = {
