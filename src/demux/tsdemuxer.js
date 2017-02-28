@@ -91,7 +91,7 @@
   // feed incoming data to the front of the parsing pipeline
   push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN){
     var avcData = this._avcData, aacData = this._aacData, pes,
-        id3Data = this._id3Data, start, len = data.length, stt, pid, atf,
+        id3Data = this._id3Data, start, len = data.length, stt, pid, atf, info, num,
         offset, codecsOnly = this.remuxer.passthrough, unknownPIDs = false;
     this.audioCodec = audioCodec;
     this.videoCodec = videoCodec;
@@ -138,7 +138,7 @@
     // don't parse last TS packet if incomplete
     len -= len % 188;
     // loop through TS packets
-    for (start = 0; start < len; start += 188) {
+    for (start = 0, num = 0; start < len; start += 188) {
       if (data[start] === 0x47) {
         stt = !!(data[start + 1] & 0x40);
         // pid is a 13-bit field starting at the last bit of TS[1]
@@ -234,16 +234,22 @@
             break;
         }
       } else {
-        let i, len = data.length, info = `len:${len} [`;
-        for (i = 0, len = Math.min(len, 10); i<len; i++) {
-          if (i) {
-            info += ',';
+        if (num === 0) {
+          let i, len = data.length;
+          info = `len:${len} [`;
+          for (i = 0, len = Math.min(len, 10); i<len; i++) {
+            if (i) {
+              info += ',';
+            }
+            info += data[start+i];
           }
-          info += data[start+i];
+          info += '..]';
         }
-        info += '..]';
-        this.observer.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47 '+info});
+        num++;
       }
+    }
+    if (num) {
+      this.observer.trigger(Event.ERROR, {type : ErrorTypes.MEDIA_ERROR, details: ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47 sn:'+sn+' samples: '+num+' '+info});
     }
     // parse last PES packet
     if (final) {

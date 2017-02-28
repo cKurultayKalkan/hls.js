@@ -5327,6 +5327,8 @@ var TSDemuxer = function () {
           stt,
           pid,
           atf,
+          info,
+          num,
           offset,
           codecsOnly = this.remuxer.passthrough,
           unknownPIDs = false;
@@ -5375,7 +5377,7 @@ var TSDemuxer = function () {
       // don't parse last TS packet if incomplete
       len -= len % 188;
       // loop through TS packets
-      for (start = 0; start < len; start += 188) {
+      for (start = 0, num = 0; start < len; start += 188) {
         if (data[start] === 0x47) {
           stt = !!(data[start + 1] & 0x40);
           // pid is a 13-bit field starting at the last bit of TS[1]
@@ -5471,18 +5473,23 @@ var TSDemuxer = function () {
               break;
           }
         } else {
-          var i = void 0,
-              _len = data.length,
-              info = 'len:' + _len + ' [';
-          for (i = 0, _len = Math.min(_len, 10); i < _len; i++) {
-            if (i) {
-              info += ',';
+          if (num === 0) {
+            var i = void 0,
+                _len = data.length;
+            info = 'len:' + _len + ' [';
+            for (i = 0, _len = Math.min(_len, 10); i < _len; i++) {
+              if (i) {
+                info += ',';
+              }
+              info += data[start + i];
             }
-            info += data[start + i];
+            info += '..]';
           }
-          info += '..]';
-          this.observer.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47 ' + info });
+          num++;
         }
+      }
+      if (num) {
+        this.observer.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.FRAG_PARSING_ERROR, fatal: false, reason: 'TS packet did not start with 0x47 sn:' + sn + ' samples: ' + num + ' ' + info });
       }
       // parse last PES packet
       if (final) {
@@ -7034,7 +7041,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-99';
+      return '0.6.1-100';
     }
   }, {
     key: 'Events',
