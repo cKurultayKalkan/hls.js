@@ -4,6 +4,7 @@
 import ADTS from './adts';
 import {logger} from '../utils/logger';
 import ID3 from '../demux/id3';
+import Event from '../events';
 
  class AACDemuxer {
 
@@ -32,11 +33,11 @@ import ID3 from '../demux/id3';
 
 
   // feed incoming data to the front of the parsing pipeline
-  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration) {
+  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final) {
     var track = this._aacTrack,
         id3 = new ID3(data),
         pts = 90*id3.timeStamp,
-        config, frameLength, frameDuration, frameIndex, offset, headerLength, stamp, len, aacSample;
+        config, frameLength, frameDuration, frameIndex, offset, headerLength, stamp, len, aacSample, startPTS, endPTS;
     // look for ADTS header (0xFFFx)
     for (offset = id3.length, len = data.length; offset < len - 1; offset++) {
       if ((data[offset] === 0xff) && (data[offset+1] & 0xf0) === 0xf0) {
@@ -83,7 +84,18 @@ import ID3 from '../demux/id3';
         break;
       }
     }
+    if (track.samples.length && final) {
+      let timescale = this.remuxer.PES_TIMESCALE;
+      let initDTS = this.remuxer._initDTS === undefined ?
+        track.samples[0].dts - timescale * timeOffset : this.remuxer._initDTS;
+      let nextAvcDts = timeOffset * timescale;
+      startPTS = this.remuxer._PTSNormalize(track.samples[0].pts - initDTS, nextAvcDts)/timescale;
+      endPTS = this.remuxer._PTSNormalize(track.samples[track.samples.length - 1].pts + frameDuration - initDTS, nextAvcDts)/timescale;
+    }
     this.remuxer.remux(this._aacTrack,{samples : []}, {samples : [ { pts: pts, dts : pts, unit : id3.payload} ]}, { samples: [] }, timeOffset);
+    if (final) {
+      this.observer.trigger(Event.FRAG_PARSED, {startPTS: startPTS, endPTS: endPTS, PTSDTSshift: 0});
+    }
   }
 
   destroy() {

@@ -4015,6 +4015,10 @@ var _id = _dereq_('../demux/id3');
 
 var _id2 = _interopRequireDefault(_id);
 
+var _events = _dereq_('../events');
+
+var _events2 = _interopRequireDefault(_events);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -4035,7 +4039,7 @@ var AACDemuxer = function () {
 
 
     // feed incoming data to the front of the parsing pipeline
-    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration) {
+    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final) {
       var track = this._aacTrack,
           id3 = new _id2.default(data),
           pts = 90 * id3.timeStamp,
@@ -4047,7 +4051,9 @@ var AACDemuxer = function () {
           headerLength,
           stamp,
           len,
-          aacSample;
+          aacSample,
+          startPTS,
+          endPTS;
       // look for ADTS header (0xFFFx)
       for (offset = id3.length, len = data.length; offset < len - 1; offset++) {
         if (data[offset] === 0xff && (data[offset + 1] & 0xf0) === 0xf0) {
@@ -4092,7 +4098,17 @@ var AACDemuxer = function () {
           break;
         }
       }
+      if (track.samples.length && final) {
+        var timescale = this.remuxer.PES_TIMESCALE;
+        var initDTS = this.remuxer._initDTS === undefined ? track.samples[0].dts - timescale * timeOffset : this.remuxer._initDTS;
+        var nextAvcDts = timeOffset * timescale;
+        startPTS = this.remuxer._PTSNormalize(track.samples[0].pts - initDTS, nextAvcDts) / timescale;
+        endPTS = this.remuxer._PTSNormalize(track.samples[track.samples.length - 1].pts + frameDuration - initDTS, nextAvcDts) / timescale;
+      }
       this.remuxer.remux(this._aacTrack, { samples: [] }, { samples: [{ pts: pts, dts: pts, unit: id3.payload }] }, { samples: [] }, timeOffset);
+      if (final) {
+        this.observer.trigger(_events2.default.FRAG_PARSED, { startPTS: startPTS, endPTS: endPTS, PTSDTSshift: 0 });
+      }
     }
   }, {
     key: 'destroy',
@@ -4122,7 +4138,7 @@ var AACDemuxer = function () {
 
 exports.default = AACDemuxer;
 
-},{"../demux/id3":19,"../utils/logger":39,"./adts":14}],14:[function(_dereq_,module,exports){
+},{"../demux/id3":19,"../events":23,"../utils/logger":39,"./adts":14}],14:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -7041,7 +7057,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-100';
+      return '0.6.1-101';
     }
   }, {
     key: 'Events',
