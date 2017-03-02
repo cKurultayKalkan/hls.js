@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/hola/hls.js/issues"
   },
-  "main": "./dist/hls.js",
+  "main": "./lib/hls.js",
   "private": false,
   "scripts": {
     "login": "c=`npm c ls`; test \"${c#*@hola}\" != \"$c\" || npm login --scope @hola.org",
