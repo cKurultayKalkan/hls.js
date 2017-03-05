@@ -780,11 +780,12 @@ var BufferController = function (_EventHandler) {
     key: 'isSbUpdating',
     value: function isSbUpdating() {
       var sourceBuffer = this.sourceBuffer;
-      if (sourceBuffer) {
-        for (var type in sourceBuffer) {
-          if (sourceBuffer[type].updating) {
-            return true;
-          }
+      if (!sourceBuffer) {
+        return;
+      }
+      for (var type in sourceBuffer) {
+        if (sourceBuffer[type].updating) {
+          return true;
         }
       }
     }
@@ -835,6 +836,8 @@ var BufferController = function (_EventHandler) {
       if (this._needsEos) {
         this.onBufferEos();
       }
+
+      _logger.logger.log('sb updateend');
 
       this.updateMediaElementDuration();
 
@@ -1081,14 +1084,14 @@ var BufferController = function (_EventHandler) {
           return;
         }
         if (this.isSbUpdating()) {
-          //logger.log('sb update in progress');
+          _logger.logger.log('sb update in progress');
           return;
         }
         if (segments.length) {
           var segment = segments.shift();
           this.dumpSegment(segment);
           try {
-            //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
+            _logger.logger.log('appending ' + segment.type + ' SB, size:' + segment.data.length);
             if (sourceBuffer[segment.type]) {
               this.lastSegment = segment;
               sourceBuffer[segment.type].appendBuffer(segment.data);
@@ -1102,7 +1105,7 @@ var BufferController = function (_EventHandler) {
             }
           } catch (err) {
             // in case any error occured while appending, put back segment in segments table
-            _logger.logger.error('error while trying to append buffer:' + err.message);
+            _logger.logger.error('error while trying to append buffer: ' + err.message);
             segments.unshift(segment);
             var event = { type: _errors.ErrorTypes.MEDIA_ERROR };
             if (err.code !== 22) {
@@ -1149,7 +1152,7 @@ var BufferController = function (_EventHandler) {
     key: 'flushBuffer',
     value: function flushBuffer(startOffset, endOffset) {
       var sb, i, bufStart, bufEnd, flushStart, flushEnd;
-      //logger.log('flushBuffer,pos/start/end: ' + this.media.currentTime + '/' + startOffset + '/' + endOffset);
+      _logger.logger.log('flushBuffer,pos/start/end: ' + this.media.currentTime + '/' + startOffset + '/' + endOffset);
       // safeguard to avoid infinite looping : don't try to flush more than the nb of appended segments
       if (this.flushBufferCounter < this.appended && this.sourceBuffer) {
         for (var type in this.sourceBuffer) {
@@ -6379,7 +6382,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }(); /*
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      *
@@ -7057,7 +7060,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-102';
+      return '0.6.1-103';
     }
   }, {
     key: 'Events',
@@ -10919,7 +10922,7 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj; };
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 
 function noop() {}
 

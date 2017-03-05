@@ -128,11 +128,12 @@ class BufferController extends EventHandler {
 
   isSbUpdating() {
     var sourceBuffer = this.sourceBuffer;
-    if (sourceBuffer) {
-      for (var type in sourceBuffer) {
-        if (sourceBuffer[type].updating) {
-          return true;
-        }
+    if (!sourceBuffer) {
+      return;
+    }
+    for (var type in sourceBuffer) {
+      if (sourceBuffer[type].updating) {
+        return true;
       }
     }
   }
@@ -175,6 +176,8 @@ class BufferController extends EventHandler {
     if (this._needsEos) {
       this.onBufferEos();
     }
+
+    logger.log('sb updateend');
 
     this.updateMediaElementDuration();
 
@@ -402,14 +405,14 @@ class BufferController extends EventHandler {
         return;
       }
       if (this.isSbUpdating()) {
-        //logger.log('sb update in progress');
+        logger.log('sb update in progress');
         return;
       }
       if (segments.length) {
         var segment = segments.shift();
         this.dumpSegment(segment);
         try {
-          //logger.log(`appending ${segment.type} SB, size:${segment.data.length});
+          logger.log(`appending ${segment.type} SB, size:${segment.data.length}`);
           if(sourceBuffer[segment.type]) {
             this.lastSegment = segment;
             sourceBuffer[segment.type].appendBuffer(segment.data);
@@ -423,7 +426,7 @@ class BufferController extends EventHandler {
           }
         } catch(err) {
           // in case any error occured while appending, put back segment in segments table
-          logger.error(`error while trying to append buffer:${err.message}`);
+          logger.error(`error while trying to append buffer: ${err.message}`);
           segments.unshift(segment);
           var event = {type: ErrorTypes.MEDIA_ERROR};
           if(err.code !== 22) {
@@ -467,7 +470,7 @@ class BufferController extends EventHandler {
   */
   flushBuffer(startOffset, endOffset) {
     var sb, i, bufStart, bufEnd, flushStart, flushEnd;
-    //logger.log('flushBuffer,pos/start/end: ' + this.media.currentTime + '/' + startOffset + '/' + endOffset);
+    logger.log(`flushBuffer,pos/start/end: ${this.media.currentTime}/${startOffset}/${endOffset}`);
     // safeguard to avoid infinite looping : don't try to flush more than the nb of appended segments
     if (this.flushBufferCounter < this.appended && this.sourceBuffer) {
       for (var type in this.sourceBuffer) {
