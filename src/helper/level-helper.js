@@ -6,6 +6,10 @@ import {logger} from '../utils/logger';
 
 class LevelHelper {
 
+  static isLive(level, levels){
+    return !!(level!==undefined && levels && levels[level] && levels[level].details && levels[level].details.live);
+  }
+
   static canMerge(oldDetails, newDetails) {
     let {start, end} = LevelHelper.probeDetails(oldDetails, newDetails);
     return end>=start;

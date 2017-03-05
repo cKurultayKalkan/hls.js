@@ -1488,6 +1488,10 @@ var _eventHandler = _dereq_('../event-handler');
 
 var _eventHandler2 = _interopRequireDefault(_eventHandler);
 
+var _levelHelper = _dereq_('../helper/level-helper');
+
+var _levelHelper2 = _interopRequireDefault(_levelHelper);
+
 var _logger = _dereq_('../utils/logger');
 
 var _errors = _dereq_('../errors');
@@ -1542,8 +1546,8 @@ var LevelController = function (_EventHandler) {
     key: 'startLoad',
     value: function startLoad() {
       this.canload = true;
-      // speed up live playlist refresh if timer exists
-      if (this.timer) {
+      // speed up live playlist refresh
+      if (_levelHelper2.default.isLive(this._level, this._levels)) {
         this.tick();
       }
     }
@@ -1836,7 +1840,7 @@ var LevelController = function (_EventHandler) {
 
 exports.default = LevelController;
 
-},{"../errors":21,"../event-handler":22,"../events":23,"../utils/logger":39}],8:[function(_dereq_,module,exports){
+},{"../errors":21,"../event-handler":22,"../events":23,"../helper/level-helper":26,"../utils/logger":39}],8:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1944,12 +1948,17 @@ var StreamController = function (_EventHandler) {
         this.level = -1;
         this.fragLoadError = 0;
         if (media && lastCurrentTime > 0) {
+          var lastLevel = this.hls.loadLevel;
+          if (_levelHelper2.default.isLive(lastLevel, this.levels)) {
+            this.level = lastLevel;
+            this.waitLiveLevel = true;
+          }
           _logger.logger.log('configure startPosition @' + lastCurrentTime);
           if (!this.lastPaused) {
             _logger.logger.log('resuming video');
             media.play();
           }
-          this.state = State.IDLE;
+          this.state = this.level === -1 ? State.IDLE : State.WAITING_LEVEL;
         } else {
           this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
           _logger.logger.log('configure lastCurrentTime @' + this.lastCurrentTime + ' start:' + this.startPosition + ',' + startPosition);
@@ -2035,7 +2044,7 @@ var StreamController = function (_EventHandler) {
         case State.WAITING_LEVEL:
           var level = this.levels[this.level];
           // check if playlist is already loaded
-          if (level && level.details) {
+          if (level && level.details && !this.waitLiveLevel) {
             this.state = State.IDLE;
           }
           break;
@@ -2771,6 +2780,7 @@ var StreamController = function (_EventHandler) {
       }
       // only switch batck to IDLE state if we were waiting for level to start downloading a new fragment
       if (this.state === State.WAITING_LEVEL) {
+        this.waitLiveLevel = false;
         this.state = State.IDLE;
       }
       //trigger handler right now
@@ -6759,6 +6769,11 @@ var LevelHelper = function () {
   }
 
   _createClass(LevelHelper, null, [{
+    key: 'isLive',
+    value: function isLive(level, levels) {
+      return !!(level !== undefined && levels && levels[level] && levels[level].details && levels[level].details.live);
+    }
+  }, {
     key: 'canMerge',
     value: function canMerge(oldDetails, newDetails) {
       var _LevelHelper$probeDet = LevelHelper.probeDetails(oldDetails, newDetails),
@@ -7060,7 +7075,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-103';
+      return '0.6.1-104';
     }
   }, {
     key: 'Events',

@@ -4,6 +4,7 @@
 
 import Event from '../events';
 import EventHandler from '../event-handler';
+import LevelHelper from '../helper/level-helper';
 import {logger} from '../utils/logger';
 import {ErrorTypes, ErrorDetails} from '../errors';
 
@@ -41,8 +42,8 @@ class LevelController extends EventHandler {
 
   startLoad() {
     this.canload = true;
-    // speed up live playlist refresh if timer exists
-    if (this.timer) {
+    // speed up live playlist refresh
+    if (LevelHelper.isLive(this._level, this._levels)) {
       this.tick();
     }
   }

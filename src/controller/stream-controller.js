@@ -79,12 +79,17 @@ class StreamController extends EventHandler {
       this.level = -1;
       this.fragLoadError = 0;
       if (media && lastCurrentTime > 0) {
+        let lastLevel = this.hls.loadLevel;
+        if (LevelHelper.isLive(lastLevel, this.levels)) {
+          this.level = lastLevel;
+          this.waitLiveLevel = true;
+        }
         logger.log(`configure startPosition @${lastCurrentTime}`);
         if (!this.lastPaused) {
           logger.log('resuming video');
           media.play();
         }
-        this.state = State.IDLE;
+        this.state = this.level===-1 ? State.IDLE : State.WAITING_LEVEL;
       } else {
         this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
         logger.log(`configure lastCurrentTime @${this.lastCurrentTime} start:${this.startPosition},${startPosition}`);
@@ -166,7 +171,7 @@ class StreamController extends EventHandler {
       case State.WAITING_LEVEL:
         var level = this.levels[this.level];
         // check if playlist is already loaded
-        if (level && level.details) {
+        if (level && level.details && !this.waitLiveLevel) {
           this.state = State.IDLE;
         }
         break;
@@ -888,6 +893,7 @@ class StreamController extends EventHandler {
     }
     // only switch batck to IDLE state if we were waiting for level to start downloading a new fragment
     if (this.state === State.WAITING_LEVEL) {
+      this.waitLiveLevel = false;
       this.state = State.IDLE;
     }
     //trigger handler right now
