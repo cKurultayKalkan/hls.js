@@ -770,7 +770,7 @@ var BufferController = function (_EventHandler) {
     key: 'onFragAppending',
     value: function onFragAppending() {
       var segments = this.segments || [];
-      if (!segments.length) {
+      if (!segments.length && !this.isSbUpdating()) {
         this.hls.trigger(_events2.default.FRAG_APPENDED);
       } else {
         this.waitForAppended = true;
@@ -7075,7 +7075,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-105';
+      return '0.6.1-106';
     }
   }, {
     key: 'Events',

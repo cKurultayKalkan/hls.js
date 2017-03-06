@@ -119,7 +119,7 @@ class BufferController extends EventHandler {
 
   onFragAppending() {
     var segments = this.segments || [];
-    if (!segments.length) {
+    if (!segments.length && !this.isSbUpdating()) {
       this.hls.trigger(Event.FRAG_APPENDED);
     } else {
       this.waitForAppended = true;
