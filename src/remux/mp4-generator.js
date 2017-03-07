@@ -2,6 +2,7 @@
  * Generate MP4 Box
 */
 
+const UINT32_MAX = Math.pow(2, 32) - 1;
 //import Hex from '../utils/hex';
 class MP4 {
   static init() {
@@ -470,6 +471,8 @@ class MP4 {
   static traf(track,baseMediaDecodeTime) {
     var sampleDependencyTable = MP4.sdtp(track),
         id = track.id;
+    let upperWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime / (UINT32_MAX + 1));
+    let lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
     return MP4.box(MP4.types.traf,
                MP4.box(MP4.types.tfhd, new Uint8Array([
                  0x00, // version 0
@@ -480,17 +483,21 @@ class MP4 {
                  (id & 0xFF) // track_ID
                ])),
                MP4.box(MP4.types.tfdt, new Uint8Array([
-                 0x00, // version 0
+                 0x01, // version 1
                  0x00, 0x00, 0x00, // flags
-                 (baseMediaDecodeTime >>24),
-                 (baseMediaDecodeTime >> 16) & 0XFF,
-                 (baseMediaDecodeTime >> 8) & 0XFF,
-                 (baseMediaDecodeTime & 0xFF) // baseMediaDecodeTime
+                 (upperWordBaseMediaDecodeTime >>> 24) & 0xFF,
+                 (upperWordBaseMediaDecodeTime >>> 16) & 0xFF,
+                 (upperWordBaseMediaDecodeTime >>>  8) & 0xFF,
+                 upperWordBaseMediaDecodeTime & 0xFF,
+                 (lowerWordBaseMediaDecodeTime >>> 24) & 0xFF,
+                 (lowerWordBaseMediaDecodeTime >>> 16) & 0xFF,
+                 (lowerWordBaseMediaDecodeTime >>>  8) & 0xFF,
+                 lowerWordBaseMediaDecodeTime & 0xFF
                ])),
                MP4.trun(track,
                     sampleDependencyTable.length +
                     16 + // tfhd
-                    16 + // tfdt
+                    20 + // tfdt
                     8 +  // traf header
                     16 + // mfhd
                     8 +  // moof header

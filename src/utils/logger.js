@@ -22,6 +22,8 @@ let exportedLogger = fakeLogger;
 //   return msg;
 // }
 
+var lastMsg = '';
+
 function formatMsg(type, msg) {
   msg = '[' +  type + '] > ' + msg;
   return msg;
@@ -33,6 +35,10 @@ function consolePrintFn(type) {
     return function(...args) {
       if(args[0]) {
         args[0] = formatMsg(type, args[0]);
+        if (args.join(' ') === lastMsg) {
+          return;
+        }
+        lastMsg = args.join(' ');
       }
       func.apply(window.console, args);
     };
