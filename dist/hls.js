@@ -4037,13 +4037,13 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var AACDemuxer = function () {
-  function AACDemuxer(observer, remuxerClass, config) {
+  function AACDemuxer(observer, remuxerClass, config, typeSupported) {
     _classCallCheck(this, AACDemuxer);
 
     this.observer = observer;
     this.remuxerClass = remuxerClass;
     this.config = config;
-    this.remuxer = new this.remuxerClass(observer, config);
+    this.remuxer = new this.remuxerClass(observer, config, typeSupported);
     this._aacTrack = { container: 'audio/adts', type: 'audio', id: -1, sequenceNumber: 0, samples: [], len: 0 };
   }
 
@@ -4373,12 +4373,12 @@ var DemuxerInline = function () {
         // probe for content type
         if (_tsdemuxer2.default.probe(data)) {
           if (this.typeSupported.mp2t === true) {
-            demuxer = new _tsdemuxer2.default(hls, _passthroughRemuxer2.default, this.config);
+            demuxer = new _tsdemuxer2.default(hls, _passthroughRemuxer2.default, this.config, this.typeSupported);
           } else {
-            demuxer = new _tsdemuxer2.default(hls, _mp4Remuxer2.default, this.config);
+            demuxer = new _tsdemuxer2.default(hls, _mp4Remuxer2.default, this.config, this.typeSupported);
           }
         } else if (_aacdemuxer2.default.probe(data)) {
-          demuxer = new _aacdemuxer2.default(hls, _mp4Remuxer2.default, this.config);
+          demuxer = new _aacdemuxer2.default(hls, _mp4Remuxer2.default, this.config, this.typeSupported);
         } else {
           var i = void 0,
               len = data.length,
@@ -4547,7 +4547,9 @@ var Demuxer = function () {
     this.trail = new Uint8Array(0);
     var typeSupported = {
       mp4: MediaSource.isTypeSupported('video/mp4'),
-      mp2t: hls.config.enableMP2TPassThrough && MediaSource.isTypeSupported('video/mp2t')
+      mp2t: hls.config.enableMP2TPassThrough && MediaSource.isTypeSupported('video/mp2t'),
+      mpeg: 0 && MediaSource.isTypeSupported('audio/mpeg'), // disabled because of errors after codec change
+      mp3: 0 && MediaSource.isTypeSupported('audio/mp4; codecs="mp3"') // disabled because of errors after codec change
     };
     if (hls.config.enableWorker && typeof Worker !== 'undefined') {
       _logger.logger.log('demuxing in webworker');
@@ -5267,23 +5269,24 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var TSDemuxer = function () {
-  function TSDemuxer(observer, remuxerClass, config) {
+  function TSDemuxer(observer, remuxerClass, config, typeSupported) {
     _classCallCheck(this, TSDemuxer);
 
     this.observer = observer;
     this.remuxerClass = remuxerClass;
     this.config = config;
+    this.typeSupported = typeSupported;
     this.lastCC = 0;
     this._setEmptyTracks();
     this._clearAllData();
-    this.remuxer = new this.remuxerClass(observer, config);
+    this.remuxer = new this.remuxerClass(observer, config, typeSupported);
   }
 
   _createClass(TSDemuxer, [{
     key: '_setEmptyTracks',
     value: function _setEmptyTracks() {
       this._avcTrack = Object.assign({}, this._avcTrack, { container: 'video/mp2t', type: 'video', samples: [], len: 0, nbNalu: 0, sps: undefined, pps: undefined });
-      this._aacTrack = Object.assign({}, this._aacTrack, { container: 'video/mp2t', type: 'audio', samples: [], len: 0 });
+      this._aacTrack = Object.assign({}, this._aacTrack, { container: 'video/mp2t', type: 'audio', samples: [], len: 0, isAAC: true });
       this._id3Track = Object.assign({}, this._id3Track, { type: 'id3', samples: [], len: 0 });
       this._txtTrack = Object.assign({}, this._txtTrack, { type: 'text', samples: [], len: 0 });
       this._avcTrack.sequenceNumber = this._avcTrack.sequenceNumber | 0;
@@ -5446,7 +5449,11 @@ var TSDemuxer = function () {
             case aacId:
               if (stt) {
                 if (pes = this._parsePES(aacData)) {
-                  this._parseAACPES(pes);
+                  if (this._aacTrack.isAAC) {
+                    this._parseAACPES(pes);
+                  } else {
+                    this._parseMPEGPES(pes);
+                  }
                   if (codecsOnly) {
                     // here we now that we have audio codec info
                     // if video PID is undefined OR if we have video codec info,
@@ -5482,7 +5489,7 @@ var TSDemuxer = function () {
               if (stt) {
                 offset += data[offset] + 1;
               }
-              this._parsePMT(data, offset);
+              this._parsePMT(data, offset, this.typeSupported.mpeg === true || this.typeSupported.mp3 === true);
               avcId = this._avcTrack.id;
               aacId = this._aacTrack.id;
               id3Id = this._id3Track.id;
@@ -5526,8 +5533,12 @@ var TSDemuxer = function () {
           this._parseAVCPES(this._parsePES(avcData));
           this._clearAvcData();
         }
-        if (aacData.size) {
-          this._parseAACPES(this._parsePES(aacData));
+        if (aacData.size && (pes = this._parsePES(aacData))) {
+          if (this._aacTrack.isAAC) {
+            this._parseAACPES(pes);
+          } else {
+            this._parseMPEGPES(pes);
+          }
           this._clearAacData();
         }
         if (id3Data.size) {
@@ -5682,7 +5693,7 @@ var TSDemuxer = function () {
     }
   }, {
     key: '_parsePMT',
-    value: function _parsePMT(data, offset) {
+    value: function _parsePMT(data, offset, mpegSupported) {
       var sectionLength, tableEnd, programInfoLength, pid;
       sectionLength = (data[offset + 1] & 0x0f) << 8 | data[offset + 2];
       tableEnd = offset + 3 + sectionLength - 4;
@@ -5713,6 +5724,18 @@ var TSDemuxer = function () {
             //logger.log('AVC PID:'  + pid);
             if (this._avcTrack.id === -1) {
               this._avcTrack.id = pid;
+            }
+            break;
+          // ISO/IEC 11172-3 (MPEG-1 audio)
+          // or ISO/IEC 13818-3 (MPEG-2 halved sample rate audio)
+          case 0x03:
+          case 0x04:
+            _logger.logger.log('MPEG PID:' + pid);
+            if (!mpegSupported) {
+              _logger.logger.log('MPEG audio found, not supported in this browser for now');
+            } else if (this._aacTrack.id === -1) {
+              this._aacTrack.id = pid;
+              this._aacTrack.isAAC = false;
             }
             break;
           case 0x24:
@@ -6304,6 +6327,89 @@ var TSDemuxer = function () {
       }
       this.aacOverFlow = aacOverFlow;
       this.lastAacPTS = stamp;
+    }
+  }, {
+    key: '_parseMPEGPES',
+    value: function _parseMPEGPES(pes) {
+      var data = pes.data;
+      var pts = pes.pts;
+      var length = data.length;
+      var frameIndex = 0;
+      var offset = 0;
+      var parsed;
+
+      while (offset < length && (parsed = this._parseMpeg(data, offset, length, frameIndex++, pts)) > 0) {
+        offset += parsed;
+      }
+    }
+  }, {
+    key: '_onMpegFrame',
+    value: function _onMpegFrame(data, bitRate, sampleRate, channelCount, frameIndex, pts) {
+      var frameDuration = 1152 / sampleRate * 1000;
+      var stamp = pts + frameIndex * frameDuration;
+      var track = this._aacTrack;
+
+      track.config = [];
+      track.channelCount = channelCount;
+      track.audiosamplerate = sampleRate;
+      track.duration = this._duration;
+      track.samples.push({ unit: data, pts: stamp, dts: stamp });
+      track.len += data.length;
+    }
+  }, {
+    key: '_onMpegNoise',
+    value: function _onMpegNoise(data) {
+      _logger.logger.warn('mpeg audio has noise: ' + data.length + ' bytes');
+    }
+  }, {
+    key: '_parseMpeg',
+    value: function _parseMpeg(data, start, end, frameIndex, pts) {
+      var BitratesMap = [32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+      var SamplingRateMap = [44100, 48000, 32000, 22050, 24000, 16000, 11025, 12000, 8000];
+
+      if (start + 2 > end) {
+        return -1; // we need at least 2 bytes to detect sync pattern
+      }
+      if (data[start] === 0xFF || (data[start + 1] & 0xE0) === 0xE0) {
+        // Using http://www.datavoyage.com/mpgscript/mpeghdr.htm as a reference
+        if (start + 24 > end) {
+          return -1;
+        }
+        var headerB = data[start + 1] >> 3 & 3;
+        var headerC = data[start + 1] >> 1 & 3;
+        var headerE = data[start + 2] >> 4 & 15;
+        var headerF = data[start + 2] >> 2 & 3;
+        var headerG = !!(data[start + 2] & 2);
+        if (headerB !== 1 && headerE !== 0 && headerE !== 15 && headerF !== 3) {
+          var columnInBitrates = headerB === 3 ? 3 - headerC : headerC === 3 ? 3 : 4;
+          var bitRate = BitratesMap[columnInBitrates * 14 + headerE - 1] * 1000;
+          var columnInSampleRates = headerB === 3 ? 0 : headerB === 2 ? 1 : 2;
+          var sampleRate = SamplingRateMap[columnInSampleRates * 3 + headerF];
+          var padding = headerG ? 1 : 0;
+          var channelCount = data[start + 3] >> 6 === 3 ? 1 : 2; // If bits of channel mode are `11` then it is a single channel (Mono)
+          var frameLength = headerC === 3 ? (headerB === 3 ? 12 : 6) * bitRate / sampleRate + padding << 2 : (headerB === 3 ? 144 : 72) * bitRate / sampleRate + padding | 0;
+          if (start + frameLength > end) {
+            return -1;
+          }
+          if (this._onMpegFrame) {
+            this._onMpegFrame(data.subarray(start, start + frameLength), bitRate, sampleRate, channelCount, frameIndex, pts);
+          }
+          return frameLength;
+        }
+      }
+      // noise or ID3, trying to skip
+      var offset = start + 2;
+      while (offset < end) {
+        if (data[offset - 1] === 0xFF && (data[offset] & 0xE0) === 0xE0) {
+          // sync pattern is found
+          if (this._onMpegNoise) {
+            this._onMpegNoise(data.subarray(start, offset - 1));
+          }
+          return offset - start - 1;
+        }
+        offset++;
+      }
+      return -1;
     }
   }, {
     key: '_parseID3PES',
@@ -7075,7 +7181,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-107';
+      return '0.6.1-108';
     }
   }, {
     key: 'Events',
@@ -8136,6 +8242,7 @@ var MP4 = function () {
         moof: [],
         moov: [],
         mp4a: [],
+        '.mp3': [],
         mvex: [],
         mvhd: [],
         sdtp: [],
@@ -8471,9 +8578,26 @@ var MP4 = function () {
       0x00, 0x00]), MP4.box(MP4.types.esds, MP4.esds(track)));
     }
   }, {
+    key: 'mp3',
+    value: function mp3(track) {
+      var audiosamplerate = track.audiosamplerate;
+      return MP4.box(MP4.types['.mp3'], new Uint8Array([0x00, 0x00, 0x00, // reserved
+      0x00, 0x00, 0x00, // reserved
+      0x00, 0x01, // data_reference_index
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // reserved
+      0x00, track.channelCount, // channelcount
+      0x00, 0x10, // sampleSize:16bits
+      0x00, 0x00, 0x00, 0x00, // reserved2
+      audiosamplerate >> 8 & 0xFF, audiosamplerate & 0xff, //
+      0x00, 0x00]));
+    }
+  }, {
     key: 'stsd',
     value: function stsd(track) {
       if (track.type === 'audio') {
+        if (!track.isAAC && track.codec === 'mp3') {
+          return MP4.box(MP4.types.stsd, MP4.STSD, MP4.mp3(track));
+        }
         return MP4.box(MP4.types.stsd, MP4.STSD, MP4.mp4a(track));
       } else {
         return MP4.box(MP4.types.stsd, MP4.STSD, MP4.avc1(track));
@@ -8635,11 +8759,12 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var MP4Remuxer = function () {
-  function MP4Remuxer(observer, config) {
+  function MP4Remuxer(observer, config, typeSupported) {
     _classCallCheck(this, MP4Remuxer);
 
     this.observer = observer;
     this.config = config;
+    this.typeSupported = typeSupported;
     this.ISGenerated = false;
     this.PES2MP4SCALEFACTOR = 4;
     this.PES_TIMESCALE = 90000;
@@ -8737,13 +8862,24 @@ var MP4Remuxer = function () {
             }
             return greatestCommonDivisor(b, a % b);
           };
-          audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate, 1024);
+          audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate, audioTrack.isAAC ? 1024 : 1152);
         }
         _logger.logger.log('audio mp4 timescale :' + audioTrack.timescale);
+        var container = 'audio/mp4';
+        if (!audioTrack.isAAC) {
+          if (this.typeSupported.mpeg) {
+            // Chrome and Safari
+            container = 'audio/mpeg';
+            audioTrack.codec = '';
+          } else if (this.typeSupported.mp3 === true) {
+            // Firefox
+            audioTrack.codec = 'mp3';
+          }
+        }
         tracks.audio = {
-          container: 'audio/mp4',
+          container: container,
           codec: audioTrack.codec,
-          initSegment: _mp4Generator2.default.initSegment([audioTrack]),
+          initSegment: !audioTrack.isAAC && this.typeSupported.mpeg ? new Uint8Array() : _mp4Generator2.default.initSegment([audioTrack]),
           metadata: {
             channelCount: audioTrack.channelCount
           }
@@ -8986,9 +9122,10 @@ var MP4Remuxer = function () {
       var pesTimeScale = this.PES_TIMESCALE,
           mp4timeScale = track.timescale,
           pes2mp4ScaleFactor = pesTimeScale / mp4timeScale,
-          expectedSampleDuration = track.timescale * 1024 / track.audiosamplerate;
+          expectedSampleDuration = track.timescale * (track.isAAC ? 1024 : 1152) / track.audiosamplerate,
+          rawMPEG = !track.isAAC && this.typeSupported.mpeg;
       var view,
-          offset = 8,
+          offset = rawMPEG ? 0 : 8,
           aacSample,
           mp4Sample,
           unit,
@@ -9014,7 +9151,7 @@ var MP4Remuxer = function () {
       // and this also avoids audio glitches/cut when switching quality, or reporting wrong duration on first audio frame
 
       contiguous |= samples0.length && this.nextAacPts && Math.abs(timeOffset - this.nextAacPts / pesTimeScale) < 0.1;
-      var nextAacPts = contiguous ? this.nextAacPts : timeOffset * pesTimeScale;
+      var nextAacPts = contiguous && this.nextAacPts !== undefined ? this.nextAacPts : timeOffset * pesTimeScale;
 
       // If the audio track is missing samples, the frames seem to get "left-shifted" within the
       // resulting mp4 segment, causing sync issues and leaving gaps at the end of the audio segment.
@@ -9032,7 +9169,7 @@ var MP4Remuxer = function () {
       });
 
       // only inject/drop audio frames in case time offset is accurate
-      if (accurate) {
+      if (accurate && track.isAAC) {
         for (var _i3 = 0; _i3 < samples0.length;) {
           // First, let's see how far off this frame is from where we expect it to be
           var sample = samples0[_i3],
@@ -9104,7 +9241,7 @@ var MP4Remuxer = function () {
           var _delta = Math.round(1000 * (ptsnorm - nextAacPts) / pesTimeScale),
               numMissingFrames = 0;
           // log delta
-          if (contiguous && _delta) {
+          if (contiguous && _delta && track.isAAC) {
             if (_delta > 0) {
               numMissingFrames = Math.round((ptsnorm - nextAacPts) / pesFrameDuration);
               _logger.logger.log(_delta + ' ms hole between AAC samples detected,filling it');
@@ -9133,10 +9270,14 @@ var MP4Remuxer = function () {
           }
           /* concatenate the audio data and construct the mdat in place
             (need 8 more bytes to fill length and mdat type) */
-          mdat = new Uint8Array(track.len + 8);
-          view = new DataView(mdat.buffer);
-          view.setUint32(0, mdat.byteLength);
-          mdat.set(_mp4Generator2.default.types.mdat, 4);
+          if (rawMPEG) {
+            mdat = new Uint8Array(track.len);
+          } else {
+            mdat = new Uint8Array(track.len + 8);
+            view = new DataView(mdat.buffer);
+            view.setUint32(0, mdat.byteLength);
+            mdat.set(_mp4Generator2.default.types.mdat, 4);
+          }
           for (var _i4 = 0; _i4 < numMissingFrames; _i4++) {
             newStamp = ptsnorm - (numMissingFrames - _i4) * pesFrameDuration;
             fillFrame = _aac2.default.getSilentFrame(track.channelCount);
@@ -9192,7 +9333,11 @@ var MP4Remuxer = function () {
         //logger.log('Audio/PTS/PTSend:' + aacSample.pts.toFixed(0) + '/' + this.nextAacDts.toFixed(0));
         track.len = 0;
         track.samples = samples;
-        moof = _mp4Generator2.default.moof(track.sequenceNumber++, firstDTS / pes2mp4ScaleFactor, track);
+        if (rawMPEG) {
+          moof = new Uint8Array();
+        } else {
+          moof = _mp4Generator2.default.moof(track.sequenceNumber++, firstDTS / pes2mp4ScaleFactor, track);
+        }
         track.samples = [];
         var audioData = {
           data1: moof,

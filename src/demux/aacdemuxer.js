@@ -8,11 +8,11 @@ import Event from '../events';
 
  class AACDemuxer {
 
-  constructor(observer, remuxerClass, config) {
+  constructor(observer, remuxerClass, config, typeSupported) {
     this.observer = observer;
     this.remuxerClass = remuxerClass;
     this.config = config;
-    this.remuxer = new this.remuxerClass(observer, config);
+    this.remuxer = new this.remuxerClass(observer, config, typeSupported);
     this._aacTrack = {container : 'audio/adts', type: 'audio', id :-1, sequenceNumber: 0, samples : [], len : 0};
   }
 

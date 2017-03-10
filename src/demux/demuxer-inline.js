@@ -41,12 +41,12 @@ class DemuxerInline {
       // probe for content type
       if (TSDemuxer.probe(data)) {
         if (this.typeSupported.mp2t === true) {
-          demuxer = new TSDemuxer(hls, PassThroughRemuxer, this.config);
+          demuxer = new TSDemuxer(hls, PassThroughRemuxer, this.config, this.typeSupported);
         } else {
-          demuxer = new TSDemuxer(hls, MP4Remuxer, this.config);
+          demuxer = new TSDemuxer(hls, MP4Remuxer, this.config, this.typeSupported);
         }
       } else if(AACDemuxer.probe(data)) {
-        demuxer = new AACDemuxer(hls, MP4Remuxer, this.config);
+        demuxer = new AACDemuxer(hls, MP4Remuxer, this.config, this.typeSupported);
       } else {
         let i, len = data.length, info = `len:${len} [`;
         for (i = 0, len = Math.min(len, 10); i<len; i++) {

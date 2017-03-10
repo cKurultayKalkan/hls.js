@@ -11,9 +11,10 @@ import {ErrorTypes, ErrorDetails} from '../errors';
 import '../utils/polyfill';
 
 class MP4Remuxer {
-  constructor(observer, config) {
+  constructor(observer, config, typeSupported) {
     this.observer = observer;
     this.config = config;
+    this.typeSupported = typeSupported;
     this.ISGenerated = false;
     this.PES2MP4SCALEFACTOR = 4;
     this.PES_TIMESCALE = 90000;
@@ -108,13 +109,23 @@ class MP4Remuxer {
             }
             return greatestCommonDivisor(b, a % b);
         };
-        audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate,1024);
+        audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate,(audioTrack.isAAC ? 1024 : 1152));
       }
       logger.log ('audio mp4 timescale :'+ audioTrack.timescale);
+      var container = 'audio/mp4';
+      if (!audioTrack.isAAC) {
+        if (this.typeSupported.mpeg) { // Chrome and Safari
+          container = 'audio/mpeg';
+          audioTrack.codec = '';
+        }
+        else if (this.typeSupported.mp3 === true) { // Firefox
+          audioTrack.codec = 'mp3';
+        }
+      }
       tracks.audio = {
-        container : 'audio/mp4',
+        container : container,
         codec :  audioTrack.codec,
-        initSegment : MP4.initSegment([audioTrack]),
+        initSegment : !audioTrack.isAAC && this.typeSupported.mpeg ? new Uint8Array() : MP4.initSegment([audioTrack]),
         metadata : {
           channelCount : audioTrack.channelCount
         }
@@ -350,9 +361,10 @@ class MP4Remuxer {
     let pesTimeScale = this.PES_TIMESCALE,
         mp4timeScale = track.timescale,
         pes2mp4ScaleFactor = pesTimeScale/mp4timeScale,
-        expectedSampleDuration = track.timescale * 1024 / track.audiosamplerate;
+        expectedSampleDuration = track.timescale * (track.isAAC ? 1024 : 1152) / track.audiosamplerate,
+        rawMPEG = !track.isAAC && this.typeSupported.mpeg;
     var view,
-        offset = 8,
+        offset = rawMPEG ? 0 : 8,
         aacSample, mp4Sample,
         unit,
         mdat, moof,
@@ -370,7 +382,7 @@ class MP4Remuxer {
     // and this also avoids audio glitches/cut when switching quality, or reporting wrong duration on first audio frame
 
     contiguous |= (samples0.length && this.nextAacPts && Math.abs(timeOffset-this.nextAacPts/pesTimeScale) < 0.1);
-    let nextAacPts = (contiguous ? this.nextAacPts : timeOffset*pesTimeScale);
+    let nextAacPts = (contiguous && this.nextAacPts !== undefined ? this.nextAacPts : timeOffset*pesTimeScale);
 
     // If the audio track is missing samples, the frames seem to get "left-shifted" within the
     // resulting mp4 segment, causing sync issues and leaving gaps at the end of the audio segment.
@@ -388,7 +400,7 @@ class MP4Remuxer {
     });
 
     // only inject/drop audio frames in case time offset is accurate
-    if (accurate) {
+    if (accurate && track.isAAC) {
       for (let i = 0; i < samples0.length; ) {
         // First, let's see how far off this frame is from where we expect it to be
         var sample = samples0[i],
@@ -460,7 +472,7 @@ class MP4Remuxer {
         let delta = Math.round(1000 * (ptsnorm - nextAacPts) / pesTimeScale),
             numMissingFrames = 0;
           // log delta
-          if (contiguous && delta) {
+          if (contiguous && delta && track.isAAC) {
             if (delta > 0) {
               numMissingFrames = Math.round((ptsnorm - nextAacPts) / pesFrameDuration);
               logger.log(`${delta} ms hole between AAC samples detected,filling it`);
@@ -489,10 +501,14 @@ class MP4Remuxer {
         }
         /* concatenate the audio data and construct the mdat in place
           (need 8 more bytes to fill length and mdat type) */
-        mdat = new Uint8Array(track.len + 8);
-        view = new DataView(mdat.buffer);
-        view.setUint32(0, mdat.byteLength);
-        mdat.set(MP4.types.mdat, 4);
+        if (rawMPEG) {
+          mdat = new Uint8Array(track.len);
+        } else {
+          mdat = new Uint8Array(track.len + 8);
+          view = new DataView(mdat.buffer);
+          view.setUint32(0, mdat.byteLength);
+          mdat.set(MP4.types.mdat, 4);
+        }
         for (let i = 0; i < numMissingFrames; i++) {
           newStamp = ptsnorm - (numMissingFrames - i) * pesFrameDuration;
           fillFrame = AAC.getSilentFrame(track.channelCount);
@@ -548,7 +564,11 @@ class MP4Remuxer {
       //logger.log('Audio/PTS/PTSend:' + aacSample.pts.toFixed(0) + '/' + this.nextAacDts.toFixed(0));
       track.len = 0;
       track.samples = samples;
-      moof = MP4.moof(track.sequenceNumber++, firstDTS / pes2mp4ScaleFactor, track);
+      if (rawMPEG) {
+        moof = new Uint8Array();
+      } else {
+        moof = MP4.moof(track.sequenceNumber++, firstDTS / pes2mp4ScaleFactor, track);
+      }
       track.samples = [];
       let audioData = {
         data1: moof,
