@@ -121,7 +121,7 @@ class StreamController extends EventHandler {
       }
       this.fragCurrent = null;
     }
-    this.fragPreviousSaved = this.fragPrevious;
+    this.fragPreviousSaved = this.fragPrevious||this.fragPreviousSaved;
     this.fragPrevious = null;
     if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
       this.fragParsing = frag;

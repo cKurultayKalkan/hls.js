@@ -1997,7 +1997,7 @@ var StreamController = function (_EventHandler) {
         }
         this.fragCurrent = null;
       }
-      this.fragPreviousSaved = this.fragPrevious;
+      this.fragPreviousSaved = this.fragPrevious || this.fragPreviousSaved;
       this.fragPrevious = null;
       if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
         this.fragParsing = frag;
@@ -7197,7 +7197,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-110';
+      return '0.6.1-111';
     }
   }, {
     key: 'Events',
