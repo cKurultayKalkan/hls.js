@@ -1701,7 +1701,9 @@ var LevelController = function (_EventHandler) {
         level = this._levels[levelId];
         if (level.urlId < level.url.length - 1) {
           level.urlId++;
-          level.details = undefined;
+          if (this.hls.config.clearLevelDetailsOnSwitching) {
+            level.details = undefined;
+          }
           _logger.logger.warn('level controller,' + details + ' for level ' + levelId + ': switching to redundant stream id ' + level.urlId);
         } else {
           // we could try to recover if in auto mode and current level not lowest level (0)
@@ -1926,6 +1928,7 @@ var StreamController = function (_EventHandler) {
     key: 'destroy',
     value: function destroy() {
       this.stopLoad();
+      delete this.fragPreviousSaved;
       if (this.timer) {
         clearInterval(this.timer);
         this.timer = null;
@@ -1948,6 +1951,10 @@ var StreamController = function (_EventHandler) {
         }
         if (!this.timer) {
           this.timer = setInterval(this.ontick, 100);
+        }
+        if (this.fragPreviousSaved) {
+          this.fragPrevious = this.fragPreviousSaved;
+          delete this.fragPrevious;
         }
         this.level = -1;
         this.fragLoadError = 0;
@@ -1990,6 +1997,7 @@ var StreamController = function (_EventHandler) {
         }
         this.fragCurrent = null;
       }
+      this.fragPreviousSaved = this.fragPrevious;
       this.fragPrevious = null;
       if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
         this.fragParsing = frag;
@@ -2692,6 +2700,7 @@ var StreamController = function (_EventHandler) {
       this.stalled = false;
       this.startPosition = this.lastCurrentTime = 0;
       this.fragParsing = null;
+      delete this.fragPreviousSaved;
     }
   }, {
     key: 'onManifestParsed',
@@ -7188,7 +7197,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-109';
+      return '0.6.1-110';
     }
   }, {
     key: 'Events',
@@ -7240,6 +7249,7 @@ var Hls = function () {
           fragLoadingMaxRetry: 6,
           fragLoadingRetryDelay: 1000,
           fragLoadingLoopThreshold: 1000,
+          clearLevelDetailsOnSwitching: false,
           startFragPrefetch: false,
           fpsDroppedMonitoringPeriod: 5000,
           fpsDroppedMonitoringThreshold: 0.2,

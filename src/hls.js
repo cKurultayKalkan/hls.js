@@ -86,6 +86,7 @@ class Hls {
           fragLoadingMaxRetry: 6,
           fragLoadingRetryDelay: 1000,
           fragLoadingLoopThreshold: 1000,
+          clearLevelDetailsOnSwitching: false,
           startFragPrefetch : false,
           fpsDroppedMonitoringPeriod: 5000,
           fpsDroppedMonitoringThreshold: 0.2,

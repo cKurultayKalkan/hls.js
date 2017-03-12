@@ -58,6 +58,7 @@ class StreamController extends EventHandler {
 
   destroy() {
     this.stopLoad();
+    delete this.fragPreviousSaved;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
@@ -76,6 +77,10 @@ class StreamController extends EventHandler {
       }
       if (!this.timer) {
         this.timer = setInterval(this.ontick, 100);
+      }
+      if (this.fragPreviousSaved) {
+        this.fragPrevious = this.fragPreviousSaved;
+        delete this.fragPrevious;
       }
       this.level = -1;
       this.fragLoadError = 0;
@@ -116,6 +121,7 @@ class StreamController extends EventHandler {
       }
       this.fragCurrent = null;
     }
+    this.fragPreviousSaved = this.fragPrevious;
     this.fragPrevious = null;
     if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
       this.fragParsing = frag;
@@ -806,6 +812,7 @@ class StreamController extends EventHandler {
     this.stalled = false;
     this.startPosition = this.lastCurrentTime = 0;
     this.fragParsing = null;
+    delete this.fragPreviousSaved;
   }
 
   onManifestParsed(data) {

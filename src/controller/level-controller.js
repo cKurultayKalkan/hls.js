@@ -233,7 +233,9 @@ class LevelController extends EventHandler {
       level = this._levels[levelId];
       if (level.urlId < (level.url.length - 1)) {
         level.urlId++;
-        level.details = undefined;
+        if (this.hls.config.clearLevelDetailsOnSwitching) {
+          level.details = undefined;
+        }
         logger.warn(`level controller,${details} for level ${levelId}: switching to redundant stream id ${level.urlId}`);
       } else {
         // we could try to recover if in auto mode and current level not lowest level (0)
