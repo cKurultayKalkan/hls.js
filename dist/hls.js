@@ -625,7 +625,7 @@ var AbrController = function (_EventHandler) {
 
 exports.default = AbrController;
 
-},{"../errors":21,"../event-handler":22,"../events":23,"../helper/buffer-helper":25,"../utils/logger":39}],4:[function(_dereq_,module,exports){
+},{"../errors":21,"../event-handler":22,"../events":23,"../helper/buffer-helper":25,"../utils/logger":40}],4:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1203,7 +1203,7 @@ var BufferController = function (_EventHandler) {
 
 exports.default = BufferController;
 
-},{"../errors":21,"../event-handler":22,"../events":23,"../utils/logger":39}],5:[function(_dereq_,module,exports){
+},{"../errors":21,"../event-handler":22,"../events":23,"../utils/logger":40}],5:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1471,7 +1471,7 @@ var FPSController = function (_EventHandler) {
 
 exports.default = FPSController;
 
-},{"../event-handler":22,"../events":23,"../utils/logger":39}],7:[function(_dereq_,module,exports){
+},{"../event-handler":22,"../events":23,"../utils/logger":40}],7:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1840,7 +1840,7 @@ var LevelController = function (_EventHandler) {
 
 exports.default = LevelController;
 
-},{"../errors":21,"../event-handler":22,"../events":23,"../helper/level-helper":26,"../utils/logger":39}],8:[function(_dereq_,module,exports){
+},{"../errors":21,"../event-handler":22,"../events":23,"../helper/level-helper":26,"../utils/logger":40}],8:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1876,6 +1876,10 @@ var _levelHelper = _dereq_('../helper/level-helper');
 var _levelHelper2 = _interopRequireDefault(_levelHelper);
 
 var _errors = _dereq_('../errors');
+
+var _browser = _dereq_('../utils/browser');
+
+var _browser2 = _interopRequireDefault(_browser);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -3067,6 +3071,9 @@ var StreamController = function (_EventHandler) {
             // if startPosition not buffered, let's seek to buffered.start(0)
             if (!startPositionBuffered) {
               startPosition = media.buffered.start(0);
+              if (_browser2.default.isSafari()) {
+                startPosition += 0.001;
+              }
               _logger.logger.log('target start position not buffered, seek to buffered.start(0) ' + startPosition);
             }
             _logger.logger.log('adjust currentTime from ' + currentTime + ' to ' + startPosition);
@@ -3294,7 +3301,7 @@ var StreamController = function (_EventHandler) {
 
 exports.default = StreamController;
 
-},{"../demux/demuxer":17,"../errors":21,"../event-handler":22,"../events":23,"../helper/buffer-helper":25,"../helper/level-helper":26,"../utils/binary-search":36,"../utils/logger":39}],9:[function(_dereq_,module,exports){
+},{"../demux/demuxer":17,"../errors":21,"../event-handler":22,"../events":23,"../helper/buffer-helper":25,"../helper/level-helper":26,"../utils/binary-search":36,"../utils/browser":37,"../utils/logger":40}],9:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -3475,7 +3482,7 @@ var TimelineController = function (_EventHandler) {
 
 exports.default = TimelineController;
 
-},{"../event-handler":22,"../events":23,"../utils/cea-608-parser":37,"../utils/cues":38}],10:[function(_dereq_,module,exports){
+},{"../event-handler":22,"../events":23,"../utils/cea-608-parser":38,"../utils/cues":39}],10:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4006,7 +4013,7 @@ var Decrypter = function () {
 
 exports.default = Decrypter;
 
-},{"../errors":21,"../utils/logger":39,"./aes128-decrypter":11}],13:[function(_dereq_,module,exports){
+},{"../errors":21,"../utils/logger":40,"./aes128-decrypter":11}],13:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4151,7 +4158,7 @@ var AACDemuxer = function () {
 
 exports.default = AACDemuxer;
 
-},{"../demux/id3":19,"../events":23,"../utils/logger":39,"./adts":14}],14:[function(_dereq_,module,exports){
+},{"../demux/id3":19,"../events":23,"../utils/logger":40,"./adts":14}],14:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4298,7 +4305,7 @@ var ADTS = function () {
 
 exports.default = ADTS;
 
-},{"../errors":21,"../utils/logger":39}],15:[function(_dereq_,module,exports){
+},{"../errors":21,"../utils/logger":40}],15:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4707,7 +4714,7 @@ var Demuxer = function () {
 
 exports.default = Demuxer;
 
-},{"../crypt/decrypter":12,"../demux/demuxer-inline":15,"../demux/demuxer-worker":16,"../events":23,"../utils/logger":39,"webworkify":2}],18:[function(_dereq_,module,exports){
+},{"../crypt/decrypter":12,"../demux/demuxer-inline":15,"../demux/demuxer-worker":16,"../events":23,"../utils/logger":40,"webworkify":2}],18:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5072,7 +5079,7 @@ var ExpGolomb = function () {
 
 exports.default = ExpGolomb;
 
-},{"../utils/logger":39}],19:[function(_dereq_,module,exports){
+},{"../utils/logger":40}],19:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5225,7 +5232,7 @@ var ID3 = function () {
 
 exports.default = ID3;
 
-},{"../utils/logger":39}],20:[function(_dereq_,module,exports){
+},{"../utils/logger":40}],20:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6429,7 +6436,7 @@ var TSDemuxer = function () {
 
 exports.default = TSDemuxer;
 
-},{"../errors":21,"../events":23,"../utils/logger":39,"../utils/polyfill":40,"./adts":14,"./exp-golomb":18}],21:[function(_dereq_,module,exports){
+},{"../errors":21,"../events":23,"../utils/logger":40,"../utils/polyfill":41,"./adts":14,"./exp-golomb":18}],21:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6600,7 +6607,7 @@ var EventHandler = function () {
 
 exports.default = EventHandler;
 
-},{"./errors":21,"./events":23,"./utils/logger":39}],23:[function(_dereq_,module,exports){
+},{"./errors":21,"./events":23,"./utils/logger":40}],23:[function(_dereq_,module,exports){
 'use strict';
 
 module.exports = {
@@ -7083,7 +7090,7 @@ var LevelHelper = function () {
 
 exports.default = LevelHelper;
 
-},{"../utils/logger":39}],27:[function(_dereq_,module,exports){
+},{"../utils/logger":40}],27:[function(_dereq_,module,exports){
 /**
  * HLS interface
  */
@@ -7181,7 +7188,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-108';
+      return '0.6.1-109';
     }
   }, {
     key: 'Events',
@@ -7552,7 +7559,7 @@ Hls.api.players = [];
 
 exports.default = Hls;
 
-},{"./controller/abr-controller":3,"./controller/buffer-controller":4,"./controller/cap-level-controller":5,"./controller/fps-controller":6,"./controller/level-controller":7,"./controller/stream-controller":8,"./controller/timeline-controller":9,"./errors":21,"./events":23,"./loader/fragment-loader":29,"./loader/key-loader":30,"./loader/playlist-loader":31,"./utils/cues":38,"./utils/logger":39,"./utils/xhr-loader":42,"events":1}],28:[function(_dereq_,module,exports){
+},{"./controller/abr-controller":3,"./controller/buffer-controller":4,"./controller/cap-level-controller":5,"./controller/fps-controller":6,"./controller/level-controller":7,"./controller/stream-controller":8,"./controller/timeline-controller":9,"./errors":21,"./events":23,"./loader/fragment-loader":29,"./loader/key-loader":30,"./loader/playlist-loader":31,"./utils/cues":39,"./utils/logger":40,"./utils/xhr-loader":43,"events":1}],28:[function(_dereq_,module,exports){
 'use strict';
 
 // This is mostly for support of the es6 module export
@@ -8199,7 +8206,7 @@ var PlaylistLoader = function (_EventHandler) {
 
 exports.default = PlaylistLoader;
 
-},{"../errors":21,"../event-handler":22,"../events":23,"../utils/attr-list":35,"../utils/url":41}],32:[function(_dereq_,module,exports){
+},{"../errors":21,"../event-handler":22,"../events":23,"../utils/attr-list":35,"../utils/url":42}],32:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -8754,6 +8761,10 @@ var _errors = _dereq_('../errors');
 
 _dereq_('../utils/polyfill');
 
+var _browser = _dereq_('../utils/browser');
+
+var _browser2 = _interopRequireDefault(_browser);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -8980,21 +8991,17 @@ var MP4Remuxer = function () {
       lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS, nextAvcDts), 0);
       lastPTS = Math.max(lastPTS, lastDTS);
 
-      var vendor = navigator.vendor,
-          userAgent = navigator.userAgent,
-          isSafari = vendor && vendor.indexOf('Apple') > -1 && userAgent && !userAgent.match('CriOS');
-
       // on Safari let's signal the same sample duration for all samples
       // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
       // set this constant duration as being the avg delta between consecutive DTS.
-      if (isSafari) {
+      if (_browser2.default.isSafari()) {
         mp4SampleDuration = Math.round((lastDTS - firstDTS) / (pes2mp4ScaleFactor * (inputSamples.length - 1)));
       }
 
       // normalize all PTS/DTS now ...
       for (var _i = 0; _i < inputSamples.length; _i++) {
         var _sample = inputSamples[_i];
-        if (isSafari) {
+        if (_browser2.default.isSafari()) {
           // sample DTS is computed using a constant decoding offset (mp4SampleDuration) between samples
           _sample.dts = firstDTS + _i * pes2mp4ScaleFactor * mp4SampleDuration;
         } else {
@@ -9031,7 +9038,7 @@ var MP4Remuxer = function () {
           mp4SampleLength += 4 + unit.data.byteLength;
         }
 
-        if (!isSafari) {
+        if (!_browser2.default.isSafari()) {
           // expected sample duration is the Decoding Timestamp diff of consecutive samples
           if (_i2 < inputSamples.length - 1) {
             mp4SampleDuration = inputSamples[_i2 + 1].dts - avcSample.dts;
@@ -9474,7 +9481,7 @@ var MP4Remuxer = function () {
 
 exports.default = MP4Remuxer;
 
-},{"../errors":21,"../events":23,"../helper/aac":24,"../remux/mp4-generator":32,"../utils/logger":39,"../utils/polyfill":40}],34:[function(_dereq_,module,exports){
+},{"../errors":21,"../events":23,"../helper/aac":24,"../remux/mp4-generator":32,"../utils/browser":37,"../utils/logger":40,"../utils/polyfill":41}],34:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -9723,6 +9730,21 @@ var BinarySearch = {
 module.exports = BinarySearch;
 
 },{}],37:[function(_dereq_,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+var browser = {
+  isSafari: function isSafari() {
+    var vendor = navigator.vendor,
+        userAgent = navigator.userAgent;
+    return vendor && vendor.indexOf('Apple') > -1 && userAgent && !userAgent.match('CriOS');
+  }
+};
+exports.default = browser;
+
+},{}],38:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -11025,7 +11047,7 @@ var Cea608Parser = function () {
 
 exports.default = Cea608Parser;
 
-},{}],38:[function(_dereq_,module,exports){
+},{}],39:[function(_dereq_,module,exports){
 'use strict';
 
 var Cues = {
@@ -11079,7 +11101,7 @@ var Cues = {
 
 module.exports = Cues;
 
-},{}],39:[function(_dereq_,module,exports){
+},{}],40:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -11168,7 +11190,7 @@ var enableLogs = exports.enableLogs = function enableLogs(debugConfig) {
 
 var logger = exports.logger = exportedLogger;
 
-},{}],40:[function(_dereq_,module,exports){
+},{}],41:[function(_dereq_,module,exports){
 "use strict";
 
 if (!ArrayBuffer.prototype.slice) {
@@ -11202,7 +11224,7 @@ if (!Object.assign) {
   };
 }
 
-},{}],41:[function(_dereq_,module,exports){
+},{}],42:[function(_dereq_,module,exports){
 'use strict';
 
 var URLHelper = {
@@ -11289,7 +11311,7 @@ var URLHelper = {
 
 module.exports = URLHelper;
 
-},{}],42:[function(_dereq_,module,exports){
+},{}],43:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -11442,6 +11464,6 @@ var XhrLoader = function () {
 
 exports.default = XhrLoader;
 
-},{"../utils/logger":39}]},{},[28])(28)
+},{"../utils/logger":40}]},{},[28])(28)
 });
 //# sourceMappingURL=hls.js.map

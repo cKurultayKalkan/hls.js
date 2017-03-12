@@ -9,6 +9,7 @@ import {logger} from '../utils/logger';
 import MP4 from '../remux/mp4-generator';
 import {ErrorTypes, ErrorDetails} from '../errors';
 import '../utils/polyfill';
+import browser from '../utils/browser';
 
 class MP4Remuxer {
   constructor(observer, config, typeSupported) {
@@ -220,20 +221,17 @@ class MP4Remuxer {
     lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts) ,0);
     lastPTS = Math.max(lastPTS, lastDTS);
 
-    let vendor = navigator.vendor, userAgent = navigator.userAgent,
-        isSafari = vendor && vendor.indexOf('Apple') > -1 && userAgent && !userAgent.match('CriOS');
-
-      // on Safari let's signal the same sample duration for all samples
-      // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
-      // set this constant duration as being the avg delta between consecutive DTS.
-    if (isSafari) {
+    // on Safari let's signal the same sample duration for all samples
+    // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
+    // set this constant duration as being the avg delta between consecutive DTS.
+    if (browser.isSafari()) {
       mp4SampleDuration = Math.round((lastDTS-firstDTS)/(pes2mp4ScaleFactor*(inputSamples.length-1)));
     }
 
     // normalize all PTS/DTS now ...
     for (let i = 0; i < inputSamples.length; i++) {
       let sample = inputSamples[i];
-      if (isSafari) {
+      if (browser.isSafari()) {
         // sample DTS is computed using a constant decoding offset (mp4SampleDuration) between samples
         sample.dts = firstDTS + i*pes2mp4ScaleFactor*mp4SampleDuration;
       } else {
@@ -270,7 +268,7 @@ class MP4Remuxer {
         mp4SampleLength += 4 + unit.data.byteLength;
       }
 
-      if(!isSafari) {
+      if(!browser.isSafari()) {
         // expected sample duration is the Decoding Timestamp diff of consecutive samples
         if (i < inputSamples.length - 1) {
           mp4SampleDuration = inputSamples[i+1].dts - avcSample.dts;
