@@ -454,8 +454,10 @@
           logger.log('MPEG PID:'  + pid);
           if (!mpegSupported) {
             logger.log('MPEG audio found, not supported in this browser for now');
-          } else if (this._aacTrack.id === -1) {
-            this._aacTrack.id = pid;
+          } else {
+            if (this._aacTrack.id === -1) {
+              this._aacTrack.id = pid;
+            }
             this._aacTrack.isAAC = false;
           }
           break;

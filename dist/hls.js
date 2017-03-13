@@ -664,7 +664,7 @@ var BufferController = function (_EventHandler) {
 
     // the value that we have set mediasource.duration to
     // (the actual duration may be tweaked slighly by the browser)
-    var _this = _possibleConstructorReturn(this, (BufferController.__proto__ || Object.getPrototypeOf(BufferController)).call(this, hls, _events2.default.MEDIA_ATTACHING, _events2.default.MEDIA_DETACHING, _events2.default.BUFFER_RESET, _events2.default.BUFFER_APPENDING, _events2.default.BUFFER_CODECS, _events2.default.BUFFER_EOS, _events2.default.BUFFER_FLUSHING, _events2.default.FRAG_APPENDING, _events2.default.LEVEL_UPDATED));
+    var _this = _possibleConstructorReturn(this, (BufferController.__proto__ || Object.getPrototypeOf(BufferController)).call(this, hls, _events2.default.MEDIA_ATTACHING, _events2.default.MEDIA_DETACHING, _events2.default.BUFFER_RESET, _events2.default.BUFFER_APPENDING, _events2.default.BUFFER_CODECS, _events2.default.BUFFER_EOS, _events2.default.BUFFER_FLUSHING, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_APPENDING, _events2.default.LEVEL_UPDATED));
 
     _this._msDuration = null;
     // the value that we want to set mediaSource.duration to
@@ -673,6 +673,7 @@ var BufferController = function (_EventHandler) {
     // Source Buffer listeners
     _this.onsbue = _this.onSBUpdateEnd.bind(_this);
     _this.onsbe = _this.onSBUpdateError.bind(_this);
+    _this.tracks = {};
     return _this;
   }
 
@@ -680,6 +681,44 @@ var BufferController = function (_EventHandler) {
     key: 'destroy',
     value: function destroy() {
       _eventHandler2.default.prototype.destroy.call(this);
+    }
+  }, {
+    key: 'onFragParsingData',
+    value: function onFragParsingData(data) {
+      var type = data.type;
+      var audioTrack = this.tracks.audio;
+
+      // Adjusting `SourceBuffer.timestampOffset` (desired point in the timeline where the next frames should be appended)
+      // in Chrome browser when we detect MPEG audio container and time delta between level PTS and `SourceBuffer.timestampOffset`
+      // is greater than 100ms (this is enough to handle seek for VOD or level change for LIVE videos). At the time of change we issue
+      // `SourceBuffer.abort()` and adjusting `SourceBuffer.timestampOffset` if `SourceBuffer.updating` is false or awaiting `updateend`
+      // event if SB is in updating state.
+      // More info here: https://github.com/dailymotion/hls.js/issues/332#issuecomment-257986486
+
+      if (type === 'audio' && audioTrack && audioTrack.container === 'audio/mpeg') {
+        // Chrome audio mp3 track
+        var audioBuffer = this.sourceBuffer.audio;
+        var delta = Math.abs(audioBuffer.timestampOffset - data.startPTS);
+
+        // adjust timestamp offset if time delta is greater than 100ms
+        if (delta > 0.1) {
+          var updating = audioBuffer.updating;
+
+          try {
+            audioBuffer.abort();
+          } catch (err) {
+            updating = true;
+            _logger.logger.warn('can not abort audio buffer: ' + err);
+          }
+
+          if (!updating) {
+            _logger.logger.warn('change mpeg audio timestamp offset from ' + audioBuffer.timestampOffset + ' to ' + data.startPTS);
+            audioBuffer.timestampOffset = data.startPTS;
+          } else {
+            this.audioTimestampOffset = data.startPTS;
+          }
+        }
+      }
     }
   }, {
     key: 'onMediaAttaching',
@@ -732,6 +771,7 @@ var BufferController = function (_EventHandler) {
         this.mediaSource = null;
         this.media = null;
         this.pendingTracks = null;
+        this.tracks = {};
         this.sourceBuffer = {};
         this.flushRange = [];
         this.segments = [];
@@ -828,6 +868,15 @@ var BufferController = function (_EventHandler) {
   }, {
     key: 'onSBUpdateEnd',
     value: function onSBUpdateEnd() {
+      // update timestampOffset
+      if (this.audioTimestampOffset) {
+        var audioBuffer = this.sourceBuffer.audio;
+        if (audioBuffer && !audioBuffer.updating) {
+          _logger.logger.warn('change mpeg audio timestamp offset from ' + audioBuffer.timestampOffset + ' to ' + this.audioTimestampOffset);
+          audioBuffer.timestampOffset = this.audioTimestampOffset;
+          delete this.audioTimestampOffset;
+        }
+      }
 
       if (this._needsFlush) {
         this.doFlush();
@@ -912,6 +961,7 @@ var BufferController = function (_EventHandler) {
             var sb = sourceBuffer[trackName] = mediaSource.addSourceBuffer(mimeType);
             sb.addEventListener('updateend', this.onsbue);
             sb.addEventListener('error', this.onsbe);
+            this.tracks[trackName] = { codec: codec, container: track.container };
           } catch (err) {
             _logger.logger.error('error while trying to add sourceBuffer:' + err.message);
             this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_ADD_CODEC_ERROR, fatal: false, err: err, mimeType: mimeType });
@@ -5749,8 +5799,10 @@ var TSDemuxer = function () {
             _logger.logger.log('MPEG PID:' + pid);
             if (!mpegSupported) {
               _logger.logger.log('MPEG audio found, not supported in this browser for now');
-            } else if (this._aacTrack.id === -1) {
-              this._aacTrack.id = pid;
+            } else {
+              if (this._aacTrack.id === -1) {
+                this._aacTrack.id = pid;
+              }
               this._aacTrack.isAAC = false;
             }
             break;
@@ -7197,7 +7249,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-111';
+      return '0.6.1-112';
     }
   }, {
     key: 'Events',
