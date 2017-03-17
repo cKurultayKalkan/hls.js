@@ -4,15 +4,15 @@
 import {logger} from '../utils/logger';
 import {ErrorTypes, ErrorDetails} from '../errors';
 
- class ADTS {
-
-  static getAudioConfig(observer, data, offset, audioCodec) {
+ const ADTS = {
+  getAudioConfig : function(observer, data, offset, audioCodec) {
     var adtsObjectType, // :int
         adtsSampleingIndex, // :int
         adtsExtensionSampleingIndex, // :int
         adtsChanelConfig, // :int
         config,
         userAgent = navigator.userAgent.toLowerCase(),
+        manifestCodec = audioCodec,
         adtsSampleingRates = [
             96000, 88200,
             64000, 48000,
@@ -33,7 +33,7 @@ import {ErrorTypes, ErrorDetails} from '../errors';
     adtsChanelConfig |= ((data[offset + 3] & 0xC0) >>> 6);
     logger.log(`manifest codec:${audioCodec},ADTS data:type:${adtsObjectType},sampleingIndex:${adtsSampleingIndex}[${adtsSampleingRates[adtsSampleingIndex]}Hz],channelConfig:${adtsChanelConfig}`);
     // firefox: freq less than 24kHz = AAC SBR (HE-AAC)
-    if (userAgent.indexOf('firefox') !== -1) {
+    if (/firefox/i.test(userAgent)) {
       if (adtsSampleingIndex >= 6) {
         adtsObjectType = 5;
         config = new Array(4);
@@ -52,7 +52,7 @@ import {ErrorTypes, ErrorDetails} from '../errors';
       config = new Array(2);
       adtsExtensionSampleingIndex = adtsSampleingIndex;
     } else {
-      /*  for other browsers (chrome ...)
+      /*  for other browsers (Chrome/Vivaldi/Opera ...)
           always force audio type to be HE-AAC SBR, as some browsers do not support audio codec switch properly (like Chrome ...)
       */
       adtsObjectType = 5;
@@ -125,8 +125,8 @@ import {ErrorTypes, ErrorDetails} from '../errors';
       config[2] |= 2 << 2;
       config[3] = 0;
     }
-    return {config: config, samplerate: adtsSampleingRates[adtsSampleingIndex], channelCount: adtsChanelConfig, codec: ('mp4a.40.' + adtsObjectType)};
+    return {config: config, samplerate: adtsSampleingRates[adtsSampleingIndex], channelCount: adtsChanelConfig, codec: ('mp4a.40.' + adtsObjectType), manifestCodec : manifestCodec};
   }
-}
+};
 
-export default ADTS;
+module.exports = ADTS;
