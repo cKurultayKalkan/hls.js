@@ -7829,7 +7829,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.7.4';
+      return '0.7.5-0';
     }
   }, {
     key: 'Events',
