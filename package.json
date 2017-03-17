@@ -1,19 +1,24 @@
 {
-  "name": "hls.js",
+  "name": "@hola.org/hls.js",
   "version": "0.7.4",
   "license": "Apache-2.0",
   "description": "JavaScript HLS client using MediaSourceExtension",
-  "homepage": "https://github.com/video-dev/hls.js",
+  "homepage": "https://github.com/hola/hls.js",
   "authors": "Guillaume du Pontavice <guillaume.dupontavice@dailymotion.com>",
   "repository": {
     "type": "git",
-    "url": "https://github.com/video-dev/hls.js"
+    "url": "https://github.com/hola/hls.js"
   },
   "bugs": {
-    "url": "https://github.com/video-dev/hls.js/issues"
+    "url": "https://github.com/hola/hls.js/issues"
   },
   "main": "./dist/hls.js",
   "scripts": {
+    "login": "c=`npm c ls`; test \"${c#*@hola}\" != \"$c\" || npm login --scope @hola.org",
+    "release": "run-s build login release:*",
+    "release:tag": "git tag v$npm_package_version",
+    "release:publish": "npm publish",
+    "release:pushtags": "git push --tags origin",
     "build": "npm run buildlib && rimraf dist/* && npm run builddist && npm run builddistlight",
     "buildlib": "rimraf lib/* && babel src --out-dir lib",
     "builddistlight": "browserify -t [browserify-conditionalify --definitions [--subtitle 0 --altaudio 0 ] ] -t browserify-versionify -t [babelify] -p browserify-derequire -p bundle-collapser/plugin -s Hls src/index.js --debug | exorcist dist/hls.light.js.map -b . > dist/hls.light.js && npm run minifylight",
