@@ -1,6 +1,6 @@
 {
   "name": "@hola.org/hls.js",
-  "version": "0.7.5-0",
+  "version": "0.6.1-111",
   "license": "Apache-2.0",
   "description": "JavaScript HLS client using MediaSourceExtension",
   "homepage": "https://github.com/hola/hls.js",
