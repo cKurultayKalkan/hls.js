@@ -367,6 +367,11 @@ class StreamController extends EventHandler {
     return frag;
   }
 
+  // XXX vadiml Remove once we are ready to transition to the new API
+  _findFragmentOldAPI({start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails}) {
+    return this._findFragment(start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails);
+  }
+
   _findFragment(start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails) {
     const config = this.hls.config;
     let frag;
@@ -991,7 +996,7 @@ class StreamController extends EventHandler {
         let mediaSeeking = media && media.seeking;
         let accurateTimeOffset = !mediaSeeking && (details.PTSKnown || !details.live);
         let initSegmentData = details.initSegment ? details.initSegment.data : [];
-        demuxer.push(data.payload, initSegmentData,audioCodec, currentLevel.videoCodec, fragCurrent, duration, accurateTimeOffset,undefined);
+        demuxer.push(data.payload, initSegmentData,audioCodec, currentLevel.videoCodec, fragCurrent, duration, accurateTimeOffset, undefined);
       }
     }
     this.fragLoadError = 0;
