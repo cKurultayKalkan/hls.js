@@ -369,9 +369,11 @@ class MP4Remuxer {
     moof = MP4.moof(track.sequenceNumber++, firstDTS , track);
     track.samples = [];
 
+    let lastGopPTS = Math.min(this.nextAvcDts, this.nextAudioPts)/timeScale;
     let data = {
       data1: moof,
       data2: mdat,
+      lastGopPTS: lastGopPTS,
       startPTS: firstPTS / timeScale,
       endPTS: (lastPTS +  mp4SampleDuration) / timeScale,
       startDTS: firstDTS / timeScale,

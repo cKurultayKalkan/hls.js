@@ -91,12 +91,12 @@ class Hls {
 
     // core controllers and network loaders
     const abrController = this.abrController = new config.abrController(this);
-    const bufferController  = new config.bufferController(this);
-    const capLevelController = new config.capLevelController(this);
-    const fpsController = new config.fpsController(this);
-    const playListLoader = new PlaylistLoader(this);
-    const fragmentLoader = new FragmentLoader(this);
-    const keyLoader = new KeyLoader(this);
+    const bufferController  = this.bufferController = new config.bufferController(this);
+    const capLevelController = this.capLevelController = new config.capLevelController(this);
+    const fpsController =  this.fpsController = new config.fpsController(this);
+    const playListLoader = this.playListLoader  = new PlaylistLoader(this);
+    const fragmentLoader =  this.fragmentLoader = new FragmentLoader(this);
+    const keyLoader = this.keyLoader = new KeyLoader(this);
 
     // network controllers
     const levelController = this.levelController = new LevelController(this);
@@ -134,6 +134,9 @@ class Hls {
       }
     });
     this.coreComponents = coreComponents;
+
+    Hls.api.players.push(this);
+    Hls.api.emit(Event.PLAYER_CREATED, this);
   }
 
   destroy() {
@@ -144,6 +147,12 @@ class Hls {
     this.url = null;
     this.observer.removeAllListeners();
     this._autoLevelCapping = -1;
+    var globalId = Hls.api.players.indexOf(this);
+    if (globalId<0) {
+        return;
+    }
+    Hls.api.players.splice(globalId, 1);
+    Hls.api.emit(Event.PLAYER_DESTROYED, this);
   }
 
   attachMedia(media) {
@@ -378,5 +387,8 @@ class Hls {
     }
   }
 }
+
+Hls.api = new EventEmitter();
+Hls.api.players = [];
 
 export default Hls;
