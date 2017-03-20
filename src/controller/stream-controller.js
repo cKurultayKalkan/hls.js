@@ -527,17 +527,14 @@ class StreamController extends EventHandler {
   }
 
   getBufferRange(position) {
-    var i, range,
-        bufferRange = this.bufferRange;
-    if (bufferRange) {
-      for (i = bufferRange.length - 1; i >=0; i--) {
-        range = bufferRange[i];
-        if (position >= range.start && position <= range.end) {
-          return range;
-        }
+    return BinarySearch.search(this.bufferRange, function(range) {
+      if (position < range.start) {
+        return -1;
+      } else if (position > range.end) {
+        return 1;
       }
-    }
-    return null;
+      return 0;
+    });
   }
 
   get currentLevel() {
@@ -574,19 +571,6 @@ class StreamController extends EventHandler {
     } else {
       return -1;
     }
-  }
-
-  isBuffered(position) {
-    let media = this.media;
-    if (media) {
-      let buffered = media.buffered;
-      for (let i = 0; i < buffered.length; i++) {
-        if (position >= buffered.start(i) && position <= buffered.end(i)) {
-          return true;
-        }
-      }
-    }
-    return false;
   }
 
   _checkFragmentChanged() {
@@ -1063,9 +1047,6 @@ class StreamController extends EventHandler {
           hls.trigger(Event.BUFFER_APPENDING, {type: data.type, data: buffer});
         }
       });
-
-      this.bufferRange.push({type: data.type, start: data.startPTS, end: data.endPTS, frag: frag});
-
       //trigger handler right now
       this.tick();
     } else {
@@ -1094,13 +1075,20 @@ class StreamController extends EventHandler {
   onFragAppended() {
     //trigger handler right now
     if (this.state === State.PARSED)  {
-      var frag = this.fragCurrent, stats = this.stats;
+      const frag = this.fragCurrent;
       if (frag) {
+        logger.log(`media buffered : ${this.timeRangesToString(this.media.buffered)}`);
+        // filter potentially evicted bufferRange. this is to avoid memleak on live streams
+        let bufferRange = this.bufferRange.filter(range => {return BufferHelper.isBuffered(this.media, (range.start + range.end) / 2);});
+        // push new range
+        bufferRange.push({type: frag.type, start: frag.startPTS, end: frag.endPTS, frag: frag});
+        // sort, as we use BinarySearch for lookup in getBufferRange ...
+        this.bufferRange = bufferRange.sort(function(a,b) {return (a.start - b.start);});
         this.fragPrevious = frag;
+        const stats = this.stats;
         stats.tbuffered = performance.now();
         this.fragLastKbps = Math.round(8 * stats.length / (stats.tbuffered - stats.tfirst));
         this.hls.trigger(Event.FRAG_BUFFERED, {stats: stats, frag: frag});
-        logger.log(`media buffered : ${this.timeRangesToString(this.media.buffered)}`);
         this.state = State.IDLE;
       }
       this.tick();
@@ -1289,18 +1277,8 @@ class StreamController extends EventHandler {
   }
 
   onBufferFlushed() {
-    /* after successful buffer flushing, rebuild buffer Range array
-      loop through existing buffer range and check if
-      corresponding range is still buffered. only push to new array already buffered range
-    */
-    var newRange = [],range,i;
-    for (i = 0; i < this.bufferRange.length; i++) {
-      range = this.bufferRange[i];
-      if (this.isBuffered((range.start + range.end) / 2)) {
-        newRange.push(range);
-      }
-    }
-    this.bufferRange = newRange;
+    // after successful buffer flushing, filter flushed fragments from bufferRange
+    this.bufferRange = this.bufferRange.filter(range => {return BufferHelper.isBuffered(this.media, (range.start + range.end)/2);});
 
     // handle end of immediate switching if needed
     if (this.immediateSwitch) {
