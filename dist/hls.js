@@ -5338,6 +5338,15 @@ var TSDemuxer = function () {
   _createClass(TSDemuxer, [{
     key: '_setEmptyTracks',
     value: function _setEmptyTracks() {
+      var track = void 0;
+      if (track = this._avcTrack) {
+        if (track.sps) {
+          track.savedSps = track.sps;
+        }
+        if (track.pps) {
+          track.savedPps = track.pps;
+        }
+      }
       this._avcTrack = Object.assign({}, this._avcTrack, { container: 'video/mp2t', type: 'video', samples: [], len: 0, nbNalu: 0, sps: undefined, pps: undefined });
       this._aacTrack = Object.assign({}, this._aacTrack, { container: 'video/mp2t', type: 'audio', samples: [], len: 0, isAAC: true });
       this._id3Track = Object.assign({}, this._id3Track, { type: 'id3', samples: [], len: 0 });
@@ -6008,6 +6017,13 @@ var TSDemuxer = function () {
                 key = key || payloadType === 6;
               }
 
+              if (key && !track.sps && track.savedSps) {
+                track.sps = track.savedSps;
+                if (!track.pps && track.savedPps) {
+                  track.pps = track.savedPps;
+                }
+              }
+
               // TODO: there can be more than one payload in an SEI packet...
               // TODO: need to read type and size in a while loop to get them all
               if (payloadType === 4 && expGolombDecoder.wholeBytesAvailable() !== 0) {
@@ -6058,7 +6074,8 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'SPS ';
             }
-            if (!track.sps) {
+            if (!track.sps || track.sps === track.savedSps) {
+              track.savedSps = undefined;
               expGolombDecoder = new _expGolomb2.default(unit.data);
               var config = expGolombDecoder.readSPS();
               track.width = config.width;
@@ -6083,7 +6100,8 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'PPS ';
             }
-            if (!track.pps) {
+            if (!track.pps || track.pps === track.savedPps) {
+              track.savedPps = undefined;
               track.pps = [unit.data];
             }
             break;
@@ -7236,7 +7254,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-114';
+      return '0.6.1-115';
     }
   }, {
     key: 'Events',
