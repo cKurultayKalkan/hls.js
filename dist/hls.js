@@ -2871,7 +2871,11 @@ var StreamController = function (_EventHandler) {
         _logger.logger.log('Demuxing ' + sn + ' of [' + details.startSN + ' ,' + details.endSN + '],level ' + level + ', cc ' + fragCurrent.cc);
         var demuxer = this.demuxer;
         if (demuxer) {
-          demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, details.endSN);
+          // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live) and if media is not seeking (this is to overcome potential timestamp drifts between playlists and fragments)
+          var media = this.media;
+          var mediaSeeking = media && media.seeking;
+          var accurateTimeOffset = !mediaSeeking && (details.PTSKnown || !details.live);
+          demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, accurateTimeOffset, details.endSN);
         }
         if (data.payload.final) {
           fragCurrent.loaded = true;
@@ -7232,7 +7236,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-113';
+      return '0.6.1-114';
     }
   }, {
     key: 'Events',

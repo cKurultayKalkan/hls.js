@@ -931,7 +931,11 @@ class StreamController extends EventHandler {
       logger.log(`Demuxing ${sn} of [${details.startSN} ,${details.endSN}],level ${level}, cc ${fragCurrent.cc}`);
       let demuxer = this.demuxer;
       if (demuxer) {
-        demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, details.PTSKnown || !details.live, details.endSN);
+        // time Offset is accurate if level PTS is known, or if playlist is not sliding (not live) and if media is not seeking (this is to overcome potential timestamp drifts between playlists and fragments)
+        let media = this.media;
+        let mediaSeeking = media && media.seeking;
+        let accurateTimeOffset = !mediaSeeking && (details.PTSKnown || !details.live);
+        demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, accurateTimeOffset, details.endSN);
       }
       if (data.payload.final) {
         fragCurrent.loaded = true;
