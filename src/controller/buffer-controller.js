@@ -20,7 +20,7 @@ class BufferController extends EventHandler {
       Event.BUFFER_CODECS,
       Event.BUFFER_EOS,
       Event.BUFFER_FLUSHING,
-      Event.FRAG_APPENDING,
+      Event.LEVEL_PTS_UPDATED,
       Event.LEVEL_UPDATED);
 
     // the value that we have set mediasource.duration to
@@ -32,10 +32,63 @@ class BufferController extends EventHandler {
     // Source Buffer listeners
     this.onsbue = this.onSBUpdateEnd.bind(this);
     this.onsbe  = this.onSBUpdateError.bind(this);
+    this.pendingTracks = {};
+    this.tracks = {};
   }
 
   destroy() {
     EventHandler.prototype.destroy.call(this);
+  }
+
+  onLevelPtsUpdated(data) {
+    let type = data.type;
+    let audioTrack = this.tracks.audio;
+
+    // Adjusting `SourceBuffer.timestampOffset` (desired point in the timeline where the next frames should be appended)
+    // in Chrome browser when we detect MPEG audio container and time delta between level PTS and `SourceBuffer.timestampOffset`
+    // is greater than 100ms (this is enough to handle seek for VOD or level change for LIVE videos). At the time of change we issue
+    // `SourceBuffer.abort()` and adjusting `SourceBuffer.timestampOffset` if `SourceBuffer.updating` is false or awaiting `updateend`
+    // event if SB is in updating state.
+    // More info here: https://github.com/video-dev/hls.js/issues/332#issuecomment-257986486
+
+    if (type === 'audio' && audioTrack && audioTrack.container === 'audio/mpeg') { // Chrome audio mp3 track
+      let audioBuffer = this.sourceBuffer.audio;
+      let delta = Math.abs(audioBuffer.timestampOffset - data.start);
+
+      // adjust timestamp offset if time delta is greater than 100ms
+      if (delta > 0.1) {
+        let updating = audioBuffer.updating;
+
+        try {
+          audioBuffer.abort();
+        } catch (err) {
+          updating = true;
+          logger.warn('can not abort audio buffer: ' + err);
+        }
+
+        if (!updating) {
+          logger.warn('change mpeg audio timestamp offset from ' + audioBuffer.timestampOffset + ' to ' + data.start);
+          audioBuffer.timestampOffset = data.start;
+        } else {
+          this.audioTimestampOffset = data.start;
+        }
+      }
+    }
+  }
+
+  onManifestParsed(data) {
+    let audioExpected = data.audio,
+        videoExpected = data.video,
+        sourceBufferNb = 0;
+    // in case of alt audio 2 BUFFER_CODECS events will be triggered, one per stream controller
+    // sourcebuffers will be created all at once when the expected nb of tracks will be reached
+    // in case alt audio is not used, only one BUFFER_CODEC event will be fired from main stream controller
+    // it will contain the expected nb of source buffers, no need to compute it
+    if (data.altAudio && (audioExpected || videoExpected)) {
+      sourceBufferNb = (audioExpected ? 1 : 0) + (videoExpected ? 1 : 0);
+      logger.log(`${sourceBufferNb} sourceBuffer(s) expected`);
+    }
+    this.sourceBufferNb = sourceBufferNb;
   }
 
   onMediaAttaching(data) {
@@ -84,7 +137,8 @@ class BufferController extends EventHandler {
 
       this.mediaSource = null;
       this.media = null;
-      this.pendingTracks = null;
+      this.pendingTracks = {};
+      this.tracks = {};
       this.sourceBuffer = {};
       this.flushRange = [];
       this.segments = [];
@@ -131,6 +185,13 @@ class BufferController extends EventHandler {
 
 
   onSBUpdateEnd() {
+    // update timestampOffset
+    if (this.audioTimestampOffset) {
+      let audioBuffer = this.sourceBuffer.audio;
+      logger.warn('change mpeg audio timestamp offset from ' + audioBuffer.timestampOffset + ' to ' + this.audioTimestampOffset);
+      audioBuffer.timestampOffset = this.audioTimestampOffset;
+      delete this.audioTimestampOffset;
+    }
 
     if (this._needsFlush) {
       this.doFlush();
@@ -207,6 +268,8 @@ class BufferController extends EventHandler {
           let sb = sourceBuffer[trackName] = mediaSource.addSourceBuffer(mimeType);
           sb.addEventListener('updateend', this.onsbue);
           sb.addEventListener('error', this.onsbe);
+          this.tracks[trackName] = {codec: codec, container: track.container};
+          track.buffer = sb;
         } catch(err) {
           logger.error(`error while trying to add sourceBuffer:${err.message}`);
           this.hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_ADD_CODEC_ERROR, fatal: false, err: err, mimeType : mimeType});

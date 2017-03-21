@@ -324,9 +324,9 @@
           //logger.log('MPEG PID:'  + pid);
           if (!mpegSupported) {
             logger.log('MPEG audio found, not supported in this browser for now');
-          } else if (this._aacTrack.id === -1) {
-            this._aacTrack.id = pid;
-            this._aacTrack.isAAC = false;
+          } else if (result.audio === -1) {
+            result.audio = pid;
+            result.isAAC = false;
           }
           break;
 
