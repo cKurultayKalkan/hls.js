@@ -275,6 +275,21 @@ class BufferController extends EventHandler {
     this.dumpSegments = undefined;
   }
 
+  isTrackChanged(tracks) {
+    let track, sb = this.sourceBuffer;
+    if (sb.video && !tracks.video || !sb.video && sb.audio && tracks.video) {
+      return true;
+    }
+    if (sb.audio && (track = tracks.audio)) {
+      let prev = this.tracks.audio;
+      let codec = track.levelCodec || track.codec;
+      let isMp3 = track.container === 'audio/mpeg' || prev.container === 'audio/mpeg' || codec === 'mp3' || prev.codec === 'mp3';
+      if ((track.container !== prev.container || prev.codec !== codec) && isMp3) {
+        return true;
+      }
+    }
+  }
+
   onBufferCodecs(tracks) {
     let mediaSource = this.mediaSource;
 
@@ -285,6 +300,13 @@ class BufferController extends EventHandler {
     }
 
     let sourceBuffer = this.sourceBuffer;
+
+    if (this.isTrackChanged(tracks)) {
+      let media = this.media;
+      this.hls.detachMedia();
+      this.hls.attachMedia(media);
+      return;
+    }
 
     for (let trackName in tracks) {
       if(!sourceBuffer[trackName]) {

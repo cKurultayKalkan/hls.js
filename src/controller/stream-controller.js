@@ -1013,13 +1013,15 @@ class StreamController extends EventHandler {
         tracks = { audiovideo : mergedTrack };
       }
       this.hls.trigger(Event.BUFFER_CODECS,tracks);
-      // loop through tracks that are going to be provided to bufferController
-      for (trackName in tracks) {
-        track = tracks[trackName];
-        var initSegment = track.initSegment;
-        logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]${initSegment ? ',init:'+initSegment.length : ''}`);
-        if (initSegment) {
-          this.hls.trigger(Event.BUFFER_APPENDING, {type: trackName, data: initSegment});
+      if (this.state !== State.STOPPED) {
+        // loop through tracks that are going to be provided to bufferController
+        for (trackName in tracks) {
+          track = tracks[trackName];
+          var initSegment = track.initSegment;
+          logger.log(`track:${trackName},container:${track.container},codecs[level/parsed]=[${track.levelCodec}/${track.codec}]${initSegment ? ',init:'+initSegment.length : ''}`);
+          if (initSegment) {
+            this.hls.trigger(Event.BUFFER_APPENDING, {type: trackName, data: initSegment});
+          }
         }
       }
       //trigger handler right now

@@ -938,6 +938,23 @@ var BufferController = function (_EventHandler) {
       this.dumpSegments = undefined;
     }
   }, {
+    key: 'isTrackChanged',
+    value: function isTrackChanged(tracks) {
+      var track = void 0,
+          sb = this.sourceBuffer;
+      if (sb.video && !tracks.video || !sb.video && sb.audio && tracks.video) {
+        return true;
+      }
+      if (sb.audio && (track = tracks.audio)) {
+        var prev = this.tracks.audio;
+        var codec = track.levelCodec || track.codec;
+        var isMp3 = track.container === 'audio/mpeg' || prev.container === 'audio/mpeg' || codec === 'mp3' || prev.codec === 'mp3';
+        if ((track.container !== prev.container || prev.codec !== codec) && isMp3) {
+          return true;
+        }
+      }
+    }
+  }, {
     key: 'onBufferCodecs',
     value: function onBufferCodecs(tracks) {
       var mediaSource = this.mediaSource;
@@ -949,6 +966,13 @@ var BufferController = function (_EventHandler) {
       }
 
       var sourceBuffer = this.sourceBuffer;
+
+      if (this.isTrackChanged(tracks)) {
+        var media = this.media;
+        this.hls.detachMedia();
+        this.hls.attachMedia(media);
+        return;
+      }
 
       for (var trackName in tracks) {
         if (!sourceBuffer[trackName]) {
@@ -2957,13 +2981,15 @@ var StreamController = function (_EventHandler) {
           tracks = { audiovideo: mergedTrack };
         }
         this.hls.trigger(_events2.default.BUFFER_CODECS, tracks);
-        // loop through tracks that are going to be provided to bufferController
-        for (trackName in tracks) {
-          track = tracks[trackName];
-          var initSegment = track.initSegment;
-          _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']' + (initSegment ? ',init:' + initSegment.length : ''));
-          if (initSegment) {
-            this.hls.trigger(_events2.default.BUFFER_APPENDING, { type: trackName, data: initSegment });
+        if (this.state !== State.STOPPED) {
+          // loop through tracks that are going to be provided to bufferController
+          for (trackName in tracks) {
+            track = tracks[trackName];
+            var initSegment = track.initSegment;
+            _logger.logger.log('track:' + trackName + ',container:' + track.container + ',codecs[level/parsed]=[' + track.levelCodec + '/' + track.codec + ']' + (initSegment ? ',init:' + initSegment.length : ''));
+            if (initSegment) {
+              this.hls.trigger(_events2.default.BUFFER_APPENDING, { type: trackName, data: initSegment });
+            }
           }
         }
         //trigger handler right now
@@ -4601,9 +4627,12 @@ var Demuxer = function () {
     var typeSupported = {
       mp4: MediaSource.isTypeSupported('video/mp4'),
       mp2t: hls.config.enableMP2TPassThrough && MediaSource.isTypeSupported('video/mp2t'),
-      mpeg: 0 && MediaSource.isTypeSupported('audio/mpeg'), // disabled because of errors after codec change
-      mp3: 0 && MediaSource.isTypeSupported('audio/mp4; codecs="mp3"') // disabled because of errors after codec change
+      mpeg: MediaSource.isTypeSupported('audio/mpeg'),
+      mp3: MediaSource.isTypeSupported('audio/mp4; codecs="mp3"')
     };
+    if (hls.config.disableMp3) {
+      typeSupported.mpeg = typeSupported.mp3 = false;
+    }
     if (hls.config.enableWorker && typeof Worker !== 'undefined') {
       _logger.logger.log('demuxing in webworker');
       try {
@@ -7254,7 +7283,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-115';
+      return '0.6.1-116';
     }
   }, {
     key: 'Events',
