@@ -52,6 +52,10 @@ class LevelController extends EventHandler {
     this.canload = false;
   }
 
+  isVideoLevel(level) {
+    return level.videoCodec || !level.audioCodec && (level.bitrate>64000 || level.width || level.height);
+  }
+
   onManifestLoaded(data) {
     var levels0 = [],
         levels = [],
@@ -65,7 +69,7 @@ class LevelController extends EventHandler {
 
     // regroup redundant level together
     data.levels.forEach(level => {
-      if(level.videoCodec) {
+      if(this.isVideoLevel(level)) {
         videoCodecFound = true;
       }
       // erase audio codec info if browser does not support mp4a.40.34. demuxer will autodetect codec and fallback to mpeg/audio
@@ -89,7 +93,7 @@ class LevelController extends EventHandler {
     // remove audio-only level if we also have levels with audio+video codecs signalled
     if(videoCodecFound && audioCodecFound) {
       levels0.forEach(level => {
-        if(level.videoCodec) {
+        if(this.isVideoLevel(level)) {
           levels.push(level);
         }
       });

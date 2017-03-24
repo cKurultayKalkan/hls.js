@@ -1631,8 +1631,15 @@ var LevelController = function (_EventHandler) {
       this.canload = false;
     }
   }, {
+    key: 'isVideoLevel',
+    value: function isVideoLevel(level) {
+      return level.videoCodec || !level.audioCodec && (level.bitrate > 64000 || level.width || level.height);
+    }
+  }, {
     key: 'onManifestLoaded',
     value: function onManifestLoaded(data) {
+      var _this2 = this;
+
       var levels0 = [],
           levels = [],
           bitrateStart,
@@ -1648,7 +1655,7 @@ var LevelController = function (_EventHandler) {
 
       // regroup redundant level together
       data.levels.forEach(function (level) {
-        if (level.videoCodec) {
+        if (_this2.isVideoLevel(level)) {
           videoCodecFound = true;
         }
         // erase audio codec info if browser does not support mp4a.40.34. demuxer will autodetect codec and fallback to mpeg/audio
@@ -1672,7 +1679,7 @@ var LevelController = function (_EventHandler) {
       // remove audio-only level if we also have levels with audio+video codecs signalled
       if (videoCodecFound && audioCodecFound) {
         levels0.forEach(function (level) {
-          if (level.videoCodec) {
+          if (_this2.isVideoLevel(level)) {
             levels.push(level);
           }
         });
@@ -7283,7 +7290,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-116';
+      return '0.6.1-117';
     }
   }, {
     key: 'Events',
