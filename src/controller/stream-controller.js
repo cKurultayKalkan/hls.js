@@ -232,12 +232,7 @@ class StreamController extends EventHandler {
     }
 
     // if we have not yet loaded any fragment, start loading from start position
-    let pos;
-    if (this.loadedmetadata) {
-      pos = this.media.currentTime;
-    } else {
-      pos = this.nextLoadPosition;
-    }
+    let pos = this.loadedmetadata ? this.media.currentTime : this.nextLoadPosition;
     // determine next load level
     let level = hls.nextLoadLevel;
 
@@ -770,6 +765,9 @@ class StreamController extends EventHandler {
     // in case seeking occurs although no media buffered, adjust startPosition and nextLoadPosition to seek target
     if (!this.loadedmetadata) {
       this.nextLoadPosition = this.startPosition = currentTime;
+      if (this.fragCurrent && (this.fragCurrent.start > currentTime || this.fragCurrent.start+this.fragCurrent.duration < currentTime)) {
+          this.seekDuringFirst = true;
+      }
     }
     // tick to speed up processing
     this.tick();
@@ -1081,6 +1079,7 @@ class StreamController extends EventHandler {
   onFragAppended() {
     //trigger handler right now
     if (this.state === State.PARSED)  {
+      this._checkBuffer(true);
       const frag = this.fragCurrent;
       if (frag) {
         logger.log(`media buffered : ${this.timeRangesToString(this.media.buffered)}`);
@@ -1152,15 +1151,17 @@ class StreamController extends EventHandler {
     }
   }
 
-  _checkBuffer() {
+  _checkBuffer(appended) {
     var media = this.media;
     if(media && media.readyState) {
       var currentTime;
       currentTime = media.currentTime;
-      var loadedmetadata = this.loadedmetadata;
-
       // adjust currentTime to start position on loaded metadata
-      if(!loadedmetadata && media.buffered.length && !media.seeking) {
+      if(!this.loadedmetadata && media.buffered.length && appended) {
+        if (this.seekDuringFirst) {
+          this.seekDuringFirst = null;
+          return;
+        }
         this.loadedmetadata = true;
         // only adjust currentTime if different from startPosition or if startPosition not buffered
         // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
@@ -1170,11 +1171,18 @@ class StreamController extends EventHandler {
           logger.log(`target start position:${startPosition}`);
           // if startPosition not buffered, let's seek to buffered.start(0)
           if(!startPositionBuffered) {
-            startPosition = media.buffered.start(0);
+            // XXX pavelki: fix case when we asked to seek during the first
+            // segment loading
+            for (var i=0; i<media.buffered.length; i++) {
+              if (media.buffered.start(i)>startPosition) {
+                startPosition = media.buffered.start(i);
+                break;
+              }
+            }
             if (browser.isSafari()) {
               startPosition += 0.001;
             }
-            logger.log(`target start position not buffered, seek to buffered.start(0) ${startPosition}`);
+            logger.log(`target start position not buffered, seek to buffered.start(${i}) ${startPosition}`);
           }
           logger.log(`adjust currentTime from ${currentTime} to ${startPosition}`);
           media.currentTime = startPosition;

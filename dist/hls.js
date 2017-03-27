@@ -2193,12 +2193,7 @@ var StreamController = function (_EventHandler) {
       }
 
       // if we have not yet loaded any fragment, start loading from start position
-      var pos = void 0;
-      if (this.loadedmetadata) {
-        pos = this.media.currentTime;
-      } else {
-        pos = this.nextLoadPosition;
-      }
+      var pos = this.loadedmetadata ? this.media.currentTime : this.nextLoadPosition;
       // determine next load level
       var level = hls.nextLoadLevel;
 
@@ -2735,6 +2730,9 @@ var StreamController = function (_EventHandler) {
       // in case seeking occurs although no media buffered, adjust startPosition and nextLoadPosition to seek target
       if (!this.loadedmetadata) {
         this.nextLoadPosition = this.startPosition = currentTime;
+        if (this.fragCurrent && (this.fragCurrent.start > currentTime || this.fragCurrent.start + this.fragCurrent.duration < currentTime)) {
+          this.seekDuringFirst = true;
+        }
       }
       // tick to speed up processing
       this.tick();
@@ -3062,6 +3060,7 @@ var StreamController = function (_EventHandler) {
 
       //trigger handler right now
       if (this.state === State.PARSED) {
+        this._checkBuffer(true);
         var frag = this.fragCurrent;
         if (frag) {
           _logger.logger.log('media buffered : ' + this.timeRangesToString(this.media.buffered));
@@ -3139,15 +3138,17 @@ var StreamController = function (_EventHandler) {
     }
   }, {
     key: '_checkBuffer',
-    value: function _checkBuffer() {
+    value: function _checkBuffer(appended) {
       var media = this.media;
       if (media && media.readyState) {
         var currentTime;
         currentTime = media.currentTime;
-        var loadedmetadata = this.loadedmetadata;
-
         // adjust currentTime to start position on loaded metadata
-        if (!loadedmetadata && media.buffered.length && !media.seeking) {
+        if (!this.loadedmetadata && media.buffered.length && appended) {
+          if (this.seekDuringFirst) {
+            this.seekDuringFirst = null;
+            return;
+          }
           this.loadedmetadata = true;
           // only adjust currentTime if different from startPosition or if startPosition not buffered
           // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
@@ -3157,11 +3158,18 @@ var StreamController = function (_EventHandler) {
             _logger.logger.log('target start position:' + startPosition);
             // if startPosition not buffered, let's seek to buffered.start(0)
             if (!startPositionBuffered) {
-              startPosition = media.buffered.start(0);
+              // XXX pavelki: fix case when we asked to seek during the first
+              // segment loading
+              for (var i = 0; i < media.buffered.length; i++) {
+                if (media.buffered.start(i) > startPosition) {
+                  startPosition = media.buffered.start(i);
+                  break;
+                }
+              }
               if (_browser2.default.isSafari()) {
                 startPosition += 0.001;
               }
-              _logger.logger.log('target start position not buffered, seek to buffered.start(0) ' + startPosition);
+              _logger.logger.log('target start position not buffered, seek to buffered.start(' + i + ') ' + startPosition);
             }
             _logger.logger.log('adjust currentTime from ' + currentTime + ' to ' + startPosition);
             media.currentTime = startPosition;
@@ -7290,7 +7298,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-117';
+      return '0.6.1-118';
     }
   }, {
     key: 'Events',
