@@ -5635,8 +5635,8 @@ var TSDemuxer = function () {
       }
       // parse last PES packet
       if (final) {
-        if (avcData.size) {
-          this._parseAVCPES(this._parsePES(avcData));
+        if (avcData.size && (pes = this._parsePES(avcData))) {
+          this._parseAVCPES(pes);
           this._clearAvcData();
         }
         if (aacData.size && (pes = this._parsePES(aacData))) {
@@ -5647,8 +5647,8 @@ var TSDemuxer = function () {
           }
           this._clearAacData();
         }
-        if (id3Data.size) {
-          this._parseID3PES(this._parsePES(id3Data));
+        if (id3Data.size && (pes = this._parsePES(id3Data))) {
+          this._parseID3PES(pes);
           this._clearID3Data();
         }
         this.lastSN = sn;
@@ -7298,7 +7298,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-118';
+      return '0.6.1-119';
     }
   }, {
     key: 'Events',

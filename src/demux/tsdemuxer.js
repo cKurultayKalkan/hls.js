@@ -267,8 +267,8 @@
     }
     // parse last PES packet
     if (final) {
-      if (avcData.size) {
-        this._parseAVCPES(this._parsePES(avcData));
+      if (avcData.size && (pes = this._parsePES(avcData))) {
+        this._parseAVCPES(pes);
         this._clearAvcData();
       }
       if (aacData.size && (pes = this._parsePES(aacData))) {
@@ -279,8 +279,8 @@
         }
         this._clearAacData();
       }
-      if (id3Data.size) {
-        this._parseID3PES(this._parsePES(id3Data));
+      if (id3Data.size && (pes = this._parsePES(id3Data))) {
+        this._parseID3PES(pes);
         this._clearID3Data();
       }
       this.lastSN = sn;
