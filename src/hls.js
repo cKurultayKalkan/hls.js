@@ -205,7 +205,7 @@ class Hls {
   }
 
   startLoad(startPosition=0) {
-    logger.log('startLoad');
+    logger.log(`startLoad(${startPosition})`);
     this.levelController.startLoad();
     this.streamController.startLoad(startPosition);
   }

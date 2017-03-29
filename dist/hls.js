@@ -2046,10 +2046,6 @@ var StreamController = function (_EventHandler) {
             this.waitLiveLevel = true;
           }
           _logger.logger.log('configure startPosition @' + lastCurrentTime);
-          if (!this.lastPaused) {
-            _logger.logger.log('resuming video');
-            media.play();
-          }
           this.state = this.level === -1 ? State.IDLE : State.WAITING_LEVEL;
         } else {
           this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
@@ -7298,7 +7294,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-119';
+      return '0.6.1-120';
     }
   }, {
     key: 'Events',
@@ -7491,7 +7487,7 @@ var Hls = function () {
     value: function startLoad() {
       var startPosition = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
 
-      _logger.logger.log('startLoad');
+      _logger.logger.log('startLoad(' + startPosition + ')');
       this.levelController.startLoad();
       this.streamController.startLoad(startPosition);
     }

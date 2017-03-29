@@ -91,10 +91,6 @@ class StreamController extends EventHandler {
           this.waitLiveLevel = true;
         }
         logger.log(`configure startPosition @${lastCurrentTime}`);
-        if (!this.lastPaused) {
-          logger.log('resuming video');
-          media.play();
-        }
         this.state = this.level===-1 ? State.IDLE : State.WAITING_LEVEL;
       } else {
         this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
