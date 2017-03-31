@@ -15,6 +15,10 @@ class PlaylistLoader extends EventHandler {
     super(hls,
       Event.MANIFEST_LOADING,
       Event.LEVEL_LOADING);
+
+    this.postponeManifestLoading =
+        hls.config ? !!hls.config.lateManifestLoading : false;
+    this.postponedReqs = [];
   }
 
   destroy() {
@@ -27,7 +31,17 @@ class PlaylistLoader extends EventHandler {
   }
 
   onManifestLoading(data) {
+    if (this.postponeManifestLoading) {
+        this.postponedReqs.push(data);
+        return;
+    }
     this.load(data.url, null);
+  }
+
+  loadPostponedManifests() {
+      this.postponeManifestLoading = false;
+      this.postponedReqs.forEach(data=>this.onManifestLoading(data));
+      this.postponedReqs = [];
   }
 
   onLevelLoading(data) {

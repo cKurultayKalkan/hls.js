@@ -7294,7 +7294,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-120';
+      return '0.6.1-121';
     }
   }, {
     key: 'Events',
@@ -7517,6 +7517,11 @@ var Hls = function () {
       var media = this.media;
       this.detachMedia();
       this.attachMedia(media);
+    }
+  }, {
+    key: 'loadPostponedManifests',
+    value: function loadPostponedManifests() {
+      this.playlistLoader.loadPostponedManifests();
     }
 
     /** Return all quality levels **/
@@ -7933,7 +7938,11 @@ var PlaylistLoader = function (_EventHandler) {
   function PlaylistLoader(hls) {
     _classCallCheck(this, PlaylistLoader);
 
-    return _possibleConstructorReturn(this, (PlaylistLoader.__proto__ || Object.getPrototypeOf(PlaylistLoader)).call(this, hls, _events2.default.MANIFEST_LOADING, _events2.default.LEVEL_LOADING));
+    var _this = _possibleConstructorReturn(this, (PlaylistLoader.__proto__ || Object.getPrototypeOf(PlaylistLoader)).call(this, hls, _events2.default.MANIFEST_LOADING, _events2.default.LEVEL_LOADING));
+
+    _this.postponeManifestLoading = hls.config ? !!hls.config.lateManifestLoading : false;
+    _this.postponedReqs = [];
+    return _this;
   }
 
   _createClass(PlaylistLoader, [{
@@ -7949,7 +7958,22 @@ var PlaylistLoader = function (_EventHandler) {
   }, {
     key: 'onManifestLoading',
     value: function onManifestLoading(data) {
+      if (this.postponeManifestLoading) {
+        this.postponedReqs.push(data);
+        return;
+      }
       this.load(data.url, null);
+    }
+  }, {
+    key: 'loadPostponedManifests',
+    value: function loadPostponedManifests() {
+      var _this2 = this;
+
+      this.postponeManifestLoading = false;
+      this.postponedReqs.forEach(function (data) {
+        return _this2.onManifestLoading(data);
+      });
+      this.postponedReqs = [];
     }
   }, {
     key: 'onLevelLoading',
