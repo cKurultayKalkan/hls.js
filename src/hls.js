@@ -233,10 +233,6 @@ class Hls {
     this.attachMedia(media);
   }
 
-  loadPostponedManifests() {
-      this.playlistLoader.loadPostponedManifests();
-  }
-
   /** Return all quality levels **/
   get levels() {
     return this.levelController.levels;

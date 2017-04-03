@@ -7294,7 +7294,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-121';
+      return '0.6.1-122';
     }
   }, {
     key: 'Events',
@@ -7517,11 +7517,6 @@ var Hls = function () {
       var media = this.media;
       this.detachMedia();
       this.attachMedia(media);
-    }
-  }, {
-    key: 'loadPostponedManifests',
-    value: function loadPostponedManifests() {
-      this.playlistLoader.loadPostponedManifests();
     }
 
     /** Return all quality levels **/
@@ -7938,11 +7933,7 @@ var PlaylistLoader = function (_EventHandler) {
   function PlaylistLoader(hls) {
     _classCallCheck(this, PlaylistLoader);
 
-    var _this = _possibleConstructorReturn(this, (PlaylistLoader.__proto__ || Object.getPrototypeOf(PlaylistLoader)).call(this, hls, _events2.default.MANIFEST_LOADING, _events2.default.LEVEL_LOADING));
-
-    _this.postponeManifestLoading = hls.config ? !!hls.config.lateManifestLoading : false;
-    _this.postponedReqs = [];
-    return _this;
+    return _possibleConstructorReturn(this, (PlaylistLoader.__proto__ || Object.getPrototypeOf(PlaylistLoader)).call(this, hls, _events2.default.MANIFEST_LOADING, _events2.default.LEVEL_LOADING));
   }
 
   _createClass(PlaylistLoader, [{
@@ -7958,27 +7949,22 @@ var PlaylistLoader = function (_EventHandler) {
   }, {
     key: 'onManifestLoading',
     value: function onManifestLoading(data) {
-      if (this.postponeManifestLoading) {
-        this.postponedReqs.push(data);
-        return;
-      }
       this.load(data.url, null);
-    }
-  }, {
-    key: 'loadPostponedManifests',
-    value: function loadPostponedManifests() {
-      var _this2 = this;
-
-      this.postponeManifestLoading = false;
-      this.postponedReqs.forEach(function (data) {
-        return _this2.onManifestLoading(data);
-      });
-      this.postponedReqs = [];
     }
   }, {
     key: 'onLevelLoading',
     value: function onLevelLoading(data) {
       this.load(data.url, data.level, data.id);
+    }
+  }, {
+    key: 'reloadCurrentRequests',
+    value: function reloadCurrentRequests() {
+      // we only reload manifest requests, level requests will be retried anyway
+      if (this.loading && this.loader && this.id === null) {
+        this.loader.abort();
+        this.loading = false;
+        this.load(this.url, this.id, this.id2);
+      }
     }
   }, {
     key: 'load',
@@ -11476,13 +11462,17 @@ var XhrLoader = function () {
     key: 'abort',
     value: function abort() {
       var loader = this.loader,
-          timeoutHandle = this.timeoutHandle;
+          timeoutHandle = this.timeoutHandle,
+          retryHandle = this.retryHandle;
       if (loader && loader.readyState !== 4) {
         this.stats.aborted = true;
         loader.abort();
       }
       if (timeoutHandle) {
         window.clearTimeout(timeoutHandle);
+      }
+      if (retryHandle) {
+        window.clearTimeout(retryHandle);
       }
     }
   }, {
@@ -11555,7 +11545,7 @@ var XhrLoader = function () {
           if (stats.retry < this.maxRetry) {
             _logger.logger.warn(status + ' while loading ' + this.url + ', retrying in ' + this.retryDelay + '...');
             this.destroy();
-            window.setTimeout(this.loadInternal.bind(this), this.retryDelay);
+            this.retryHandle = window.setTimeout(this.loadInternal.bind(this), this.retryDelay);
             // exponential backoff
             this.retryDelay = Math.min(2 * this.retryDelay, 64000);
             stats.retry++;

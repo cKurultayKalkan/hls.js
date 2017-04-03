@@ -19,13 +19,17 @@ class XhrLoader {
 
   abort() {
     var loader = this.loader,
-        timeoutHandle = this.timeoutHandle;
+        timeoutHandle = this.timeoutHandle,
+        retryHandle = this.retryHandle;
     if (loader && loader.readyState !== 4) {
       this.stats.aborted = true;
       loader.abort();
     }
     if (timeoutHandle) {
       window.clearTimeout(timeoutHandle);
+    }
+    if (retryHandle) {
+      window.clearTimeout(retryHandle);
     }
   }
 
@@ -92,7 +96,7 @@ class XhrLoader {
         if (stats.retry < this.maxRetry) {
           logger.warn(`${status} while loading ${this.url}, retrying in ${this.retryDelay}...`);
           this.destroy();
-          window.setTimeout(this.loadInternal.bind(this), this.retryDelay);
+          this.retryHandle = window.setTimeout(this.loadInternal.bind(this), this.retryDelay);
           // exponential backoff
           this.retryDelay = Math.min(2 * this.retryDelay, 64000);
           stats.retry++;
