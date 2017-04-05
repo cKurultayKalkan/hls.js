@@ -5478,12 +5478,13 @@ var TSDemuxer = function () {
         this.insertDiscontinuity();
         this.lastCC = cc;
       }
-      if (level !== this.lastLevel) {
+      var trackSwitch = level !== this.lastLevel;
+      if (trackSwitch) {
         _logger.logger.log('level switch detected');
         this.switchLevel();
         this.lastLevel = level;
       }
-      if (sn === this.lastSN + 1 || !first) {
+      if (!trackSwitch && sn === this.lastSN + 1 || !first) {
         this.contiguous = true;
       } else {
         // flush any partial content
@@ -5495,7 +5496,7 @@ var TSDemuxer = function () {
         this._setEmptyTracks();
       }
       if (first) {
-        this.lastContiguous = sn === this.lastSN + 1;
+        this.lastContiguous = !trackSwitch && sn === this.lastSN + 1;
         this.fragStats = { keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0 };
         this.remuxAVCCount = this.remuxAACCount = 0;
         this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
@@ -7294,7 +7295,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-122';
+      return '0.6.1-123';
     }
   }, {
     key: 'Events',

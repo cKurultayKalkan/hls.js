@@ -115,12 +115,13 @@
       this.insertDiscontinuity();
       this.lastCC = cc;
     }
-    if (level !== this.lastLevel) {
+    const trackSwitch = level !== this.lastLevel;
+    if (trackSwitch) {
       logger.log('level switch detected');
       this.switchLevel();
       this.lastLevel = level;
     }
-    if (sn === (this.lastSN+1) || !first) {
+    if (!trackSwitch && sn === (this.lastSN+1) || !first) {
       this.contiguous = true;
     } else {
       // flush any partial content
@@ -132,7 +133,7 @@
       this._setEmptyTracks();
     }
     if (first) {
-      this.lastContiguous = sn === this.lastSN+1;
+      this.lastContiguous = !trackSwitch && sn === this.lastSN+1;
       this.fragStats = {keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0};
       this.remuxAVCCount = this.remuxAACCount = 0;
       this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
