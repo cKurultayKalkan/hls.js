@@ -254,6 +254,9 @@ class MP4Remuxer {
     view.setUint32(0, mdat.byteLength);
     mdat.set(MP4.types.mdat, 4);
 
+    stats.videoDurAvg = stats.videoDurStd = 0;
+    stats.cttsError = 0;
+
     for (let i = 0; i < inputSamples.length; i++) {
       let avcSample = inputSamples[i],
           mp4SampleLength = 0,
@@ -322,7 +325,14 @@ class MP4Remuxer {
           isNonSync : avcSample.key ? 0 : 1
         }
       });
+
+      stats.videoDurAvg += mp4SampleDuration/inputSamples.length;
+      stats.videoDurStd += mp4SampleDuration*mp4SampleDuration/inputSamples.length;
+      stats.cttsError += compositionTimeOffset-Math.floor(compositionTimeOffset/mp4SampleDuration)*mp4SampleDuration;
     }
+
+    stats.videoDurStd = Math.sqrt(stats.videoDurStd-stats.videoDurAvg*stats.videoDurAvg);
+
     // next AVC sample DTS should be equal to last sample DTS + last sample duration (in PES timescale)
     this.nextAvcDts = lastDTS + mp4SampleDuration*pes2mp4ScaleFactor;
     track.len = 0;
@@ -359,7 +369,8 @@ class MP4Remuxer {
     let pesTimeScale = this.PES_TIMESCALE,
         mp4timeScale = track.timescale,
         pes2mp4ScaleFactor = pesTimeScale/mp4timeScale,
-        expectedSampleDuration = track.timescale * (track.isAAC ? 1024 : 1152) / track.audiosamplerate,
+        mp4SampleDuration = track.isAAC ? 1024 : 1152,
+        expectedSampleDuration = track.timescale * mp4SampleDuration/ track.audiosamplerate,
         rawMPEG = !track.isAAC && this.typeSupported.mpeg;
     var view,
         offset = rawMPEG ? 0 : 8,
@@ -519,7 +530,7 @@ class MP4Remuxer {
           mp4Sample = {
             size: fillFrame.byteLength,
             cts: 0,
-            duration: 1024,
+            duration: mp4SampleDuration,
             flags: {
               isLeading: 0,
               isDependedOn: 0,
@@ -531,6 +542,7 @@ class MP4Remuxer {
           samples.push(mp4Sample);
         }
       }
+
       mdat.set(unit, offset);
       offset += unit.byteLength;
       //console.log('PTS/DTS/initDTS/normPTS/normDTS/relative PTS : ${aacSample.pts}/${aacSample.dts}/${this._initDTS}/${ptsnorm}/${dtsnorm}/${(aacSample.pts/4294967296).toFixed(3)}');
@@ -557,6 +569,13 @@ class MP4Remuxer {
       mp4Sample.duration = lastSampleDuration;
     }
     if (nbSamples) {
+      stats.audioDurAvg = stats.audioDurStd = 0;
+      for (let i=0; i<nbSamples; i++) {
+        stats.audioDurAvg += samples[i].duration;
+        stats.audioDurStd += samples[i].duration*samples[i].duration;
+      }
+      stats.audioDurStd = Math.sqrt(Math.abs(stats.audioDurStd-stats.audioDurAvg*stats.audioDurAvg/nbSamples)/nbSamples);
+      stats.audioDurAvg /= nbSamples;
       // next aac sample PTS should be equal to last sample PTS + duration
       this.nextAacPts = ptsnorm + pes2mp4ScaleFactor * lastSampleDuration;
       //logger.log('Audio/PTS/PTSend:' + aacSample.pts.toFixed(0) + '/' + this.nextAacDts.toFixed(0));

@@ -846,22 +846,15 @@ var BufferController = function (_EventHandler) {
       var st,
           sb = this.sourceBuffer,
           end = video.currentTime - keepSec;
-      var b = video.buffered,
-          len = b.length;
-      if (end <= 0 || sb.audio && sb.audio.updating || sb.video && sb.video.updating) {
+      var b = video.buffered;
+      if (end <= 0 || this.isSbUpdating() || !b.length) {
         return;
       }
       st = b.start(0);
-      for (var i = 1; i < len; i++) {
-        st = Math.min(st, b.start(i));
-      }
-      if (st && st < end) {
+      if (st < end) {
         _logger.logger.log('video buffered: ' + this.dump(this.media) + ' removing: [' + st + ',' + end + ']');
-        if (sb.audio) {
-          sb.audio.remove(st, end);
-        }
-        if (sb.video) {
-          sb.video.remove(st, end);
+        for (var type in sb) {
+          sb[type].remove(st, end);
         }
       }
     }
@@ -996,11 +989,8 @@ var BufferController = function (_EventHandler) {
   }, {
     key: 'onBufferAppending',
     value: function onBufferAppending(data) {
-      if (!this.segments) {
-        this.segments = [data];
-      } else {
-        this.segments.push(data);
-      }
+      this.segments = this.segments || [];
+      this.segments.push(data);
       this.doAppending();
     }
   }, {
@@ -7295,7 +7285,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-123';
+      return '0.6.1-125';
     }
   }, {
     key: 'Events',
@@ -9142,6 +9132,9 @@ var MP4Remuxer = function () {
       view.setUint32(0, mdat.byteLength);
       mdat.set(_mp4Generator2.default.types.mdat, 4);
 
+      stats.videoDurAvg = stats.videoDurStd = 0;
+      stats.cttsError = 0;
+
       for (var _i2 = 0; _i2 < inputSamples.length; _i2++) {
         var avcSample = inputSamples[_i2],
             mp4SampleLength = 0,
@@ -9209,7 +9202,14 @@ var MP4Remuxer = function () {
             isNonSync: avcSample.key ? 0 : 1
           }
         });
+
+        stats.videoDurAvg += mp4SampleDuration / inputSamples.length;
+        stats.videoDurStd += mp4SampleDuration * mp4SampleDuration / inputSamples.length;
+        stats.cttsError += compositionTimeOffset - Math.floor(compositionTimeOffset / mp4SampleDuration) * mp4SampleDuration;
       }
+
+      stats.videoDurStd = Math.sqrt(stats.videoDurStd - stats.videoDurAvg * stats.videoDurAvg);
+
       // next AVC sample DTS should be equal to last sample DTS + last sample duration (in PES timescale)
       this.nextAvcDts = lastDTS + mp4SampleDuration * pes2mp4ScaleFactor;
       track.len = 0;
@@ -9247,7 +9247,8 @@ var MP4Remuxer = function () {
       var pesTimeScale = this.PES_TIMESCALE,
           mp4timeScale = track.timescale,
           pes2mp4ScaleFactor = pesTimeScale / mp4timeScale,
-          expectedSampleDuration = track.timescale * (track.isAAC ? 1024 : 1152) / track.audiosamplerate,
+          mp4SampleDuration = track.isAAC ? 1024 : 1152,
+          expectedSampleDuration = track.timescale * mp4SampleDuration / track.audiosamplerate,
           rawMPEG = !track.isAAC && this.typeSupported.mpeg;
       var view,
           offset = rawMPEG ? 0 : 8,
@@ -9415,7 +9416,7 @@ var MP4Remuxer = function () {
             mp4Sample = {
               size: fillFrame.byteLength,
               cts: 0,
-              duration: 1024,
+              duration: mp4SampleDuration,
               flags: {
                 isLeading: 0,
                 isDependedOn: 0,
@@ -9427,6 +9428,7 @@ var MP4Remuxer = function () {
             samples.push(mp4Sample);
           }
         }
+
         mdat.set(unit, offset);
         offset += unit.byteLength;
         //console.log('PTS/DTS/initDTS/normPTS/normDTS/relative PTS : ${aacSample.pts}/${aacSample.dts}/${this._initDTS}/${ptsnorm}/${dtsnorm}/${(aacSample.pts/4294967296).toFixed(3)}');
@@ -9453,6 +9455,13 @@ var MP4Remuxer = function () {
         mp4Sample.duration = lastSampleDuration;
       }
       if (nbSamples) {
+        stats.audioDurAvg = stats.audioDurStd = 0;
+        for (var _i5 = 0; _i5 < nbSamples; _i5++) {
+          stats.audioDurAvg += samples[_i5].duration;
+          stats.audioDurStd += samples[_i5].duration * samples[_i5].duration;
+        }
+        stats.audioDurStd = Math.sqrt(Math.abs(stats.audioDurStd - stats.audioDurAvg * stats.audioDurAvg / nbSamples) / nbSamples);
+        stats.audioDurAvg /= nbSamples;
         // next aac sample PTS should be equal to last sample PTS + duration
         this.nextAacPts = ptsnorm + pes2mp4ScaleFactor * lastSampleDuration;
         //logger.log('Audio/PTS/PTSend:' + aacSample.pts.toFixed(0) + '/' + this.nextAacDts.toFixed(0));
@@ -11250,8 +11259,6 @@ var exportedLogger = fakeLogger;
 //   return msg;
 // }
 
-var lastMsg = '';
-
 function formatMsg(type, msg) {
   msg = '[' + type + '] > ' + msg;
   return msg;
@@ -11267,10 +11274,6 @@ function consolePrintFn(type) {
 
       if (args[0]) {
         args[0] = formatMsg(type, args[0]);
-        if (args.join(' ') === lastMsg) {
-          return;
-        }
-        lastMsg = args.join(' ');
       }
       func.apply(window.console, args);
     };
@@ -11278,13 +11281,28 @@ function consolePrintFn(type) {
   return noop;
 }
 
+function checkRepeatWrapper(func) {
+  var lastMsg;
+  return function () {
+    for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+      args[_key2] = arguments[_key2];
+    }
+
+    if (args.join(' ') === lastMsg) {
+      return;
+    }
+    lastMsg = args.join(' ');
+    func.apply(null, args);
+  };
+}
+
 function exportLoggerFunctions(debugConfig) {
-  for (var _len2 = arguments.length, functions = Array(_len2 > 1 ? _len2 - 1 : 0), _key2 = 1; _key2 < _len2; _key2++) {
-    functions[_key2 - 1] = arguments[_key2];
+  for (var _len3 = arguments.length, functions = Array(_len3 > 1 ? _len3 - 1 : 0), _key3 = 1; _key3 < _len3; _key3++) {
+    functions[_key3 - 1] = arguments[_key3];
   }
 
   functions.forEach(function (type) {
-    exportedLogger[type] = debugConfig[type] ? debugConfig[type].bind(debugConfig) : consolePrintFn(type);
+    exportedLogger[type] = checkRepeatWrapper(debugConfig[type] ? debugConfig[type].bind(debugConfig) : consolePrintFn(type));
   });
 }
 

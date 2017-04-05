@@ -22,8 +22,6 @@ let exportedLogger = fakeLogger;
 //   return msg;
 // }
 
-var lastMsg = '';
-
 function formatMsg(type, msg) {
   msg = '[' +  type + '] > ' + msg;
   return msg;
@@ -35,10 +33,6 @@ function consolePrintFn(type) {
     return function(...args) {
       if(args[0]) {
         args[0] = formatMsg(type, args[0]);
-        if (args.join(' ') === lastMsg) {
-          return;
-        }
-        lastMsg = args.join(' ');
       }
       func.apply(window.console, args);
     };
@@ -46,9 +40,20 @@ function consolePrintFn(type) {
   return noop;
 }
 
+function checkRepeatWrapper(func) {
+  var lastMsg;
+  return function(...args) {
+    if (args.join(' ') === lastMsg) {
+      return;
+    }
+    lastMsg = args.join(' ');
+    func.apply(null, args);
+  };
+}
+
 function exportLoggerFunctions(debugConfig, ...functions) {
   functions.forEach(function(type) {
-    exportedLogger[type] = debugConfig[type] ? debugConfig[type].bind(debugConfig) : consolePrintFn(type);
+    exportedLogger[type] = checkRepeatWrapper(debugConfig[type] ? debugConfig[type].bind(debugConfig) : consolePrintFn(type));
   });
 }
 

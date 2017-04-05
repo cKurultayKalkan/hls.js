@@ -187,21 +187,15 @@ class BufferController extends EventHandler {
 
   clear(video, keepSec) {
     var st, sb = this.sourceBuffer, end = video.currentTime - keepSec;
-    var b = video.buffered, len = b.length;
-    if (end<=0 || (sb.audio && sb.audio.updating) || (sb.video && sb.video.updating)) {
+    var b = video.buffered;
+    if (end<=0 || this.isSbUpdating() || !b.length) {
       return;
     }
     st = b.start(0);
-    for (var i=1; i<len; i++) {
-      st = Math.min(st, b.start(i));
-    }
-    if (st && st<end) {
+    if (st<end) {
       logger.log(`video buffered: ${this.dump(this.media)} removing: [${st},${end}]`);
-      if (sb.audio) {
-        sb.audio.remove(st, end);
-      }
-      if (sb.video) {
-        sb.video.remove(st, end);
+      for (var type in sb) {
+        sb[type].remove(st, end);
       }
     }
   }
@@ -329,11 +323,8 @@ class BufferController extends EventHandler {
   }
 
   onBufferAppending(data) {
-    if (!this.segments) {
-      this.segments = [ data ];
-    } else {
-      this.segments.push(data);
-    }
+    this.segments = this.segments||[];
+    this.segments.push(data);
     this.doAppending();
   }
 
