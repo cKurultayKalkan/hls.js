@@ -45,6 +45,10 @@ import Event from '../events';
       }
     }
 
+    if (first) {
+      this.fragStats = {keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0};
+    }
+
     if (!track.audiosamplerate) {
       config = ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
       track.config = config.config;
@@ -92,7 +96,8 @@ import Event from '../events';
       startPTS = this.remuxer._PTSNormalize(track.samples[0].pts - initDTS, nextAvcDts)/timescale;
       endPTS = this.remuxer._PTSNormalize(track.samples[track.samples.length - 1].pts + frameDuration - initDTS, nextAvcDts)/timescale;
     }
-    this.remuxer.remux(this._aacTrack,{samples : []}, {samples : [ { pts: pts, dts : pts, unit : id3.payload} ]}, { samples: [] }, timeOffset);
+    this.remuxer.remux(this._aacTrack,{samples : []}, {samples : [ { pts: pts, dts : pts, unit : id3.payload} ]}, { samples: [] }, timeOffset,
+       undefined, undefined, undefined, undefined, this.fragStats);
     if (final) {
       this.observer.trigger(Event.FRAG_PARSED, {startPTS: startPTS, endPTS: endPTS, PTSDTSshift: 0});
     }
