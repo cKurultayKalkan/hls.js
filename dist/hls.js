@@ -7271,6 +7271,23 @@ var Hls = function () {
   _createClass(Hls, null, [{
     key: 'isSupported',
     value: function isSupported() {
+      // Opera Mini for Android with enabled optimizations breaks m3u8 files
+      function isOperaMini() {
+        var checkOpera = /\bOPR\b\/(\d+)/i;
+        var checkChrome = / Chrome\/(\d+)(\.\d+)+.* Safari\/\d+(\.\d+)+/;
+        var opera,
+            ua = window.navigator && window.navigator.userAgent;
+        var res = checkChrome.exec(ua);
+        if (res) {
+          opera = checkOpera.exec(ua);
+          return ua.match(/Android/) && (opera ? opera[1] : undefined) < 25;
+        }
+        return false;
+      }
+      if (isOperaMini()) {
+        return false;
+      }
+
       return window.MediaSource && window.MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E,mp4a.40.2"');
     }
   }, {
@@ -7289,7 +7306,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-127';
+      return '0.6.1-128';
     }
   }, {
     key: 'Events',

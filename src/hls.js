@@ -28,6 +28,20 @@ class Hls {
   }
 
   static isSupported() {
+    // Opera Mini for Android with enabled optimizations breaks m3u8 files
+    function isOperaMini() {
+      var checkOpera = /\bOPR\b\/(\d+)/i;
+      var checkChrome = / Chrome\/(\d+)(\.\d+)+.* Safari\/\d+(\.\d+)+/;
+      var opera, ua = window.navigator && window.navigator.userAgent;
+      var res = checkChrome.exec(ua);
+      if (res) {
+        opera = checkOpera.exec(ua);
+        return ua.match(/Android/) && (opera ? opera[1] : undefined)<25;
+      }
+      return false;
+    }
+    if (isOperaMini()) {return false;}
+
     return (window.MediaSource && window.MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E,mp4a.40.2"'));
   }
 
