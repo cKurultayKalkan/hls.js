@@ -3452,11 +3452,12 @@ var TimelineController = function (_EventHandler) {
 
   _createClass(TimelineController, [{
     key: 'clearCurrentCues',
-    value: function clearCurrentCues(track) {
-      if (track && track.cues) {
-        while (track.cues.length > 0) {
-          track.removeCue(track.cues[0]);
-        }
+    value: function clearCurrentCues(track, pts) {
+      if (!track || !track.cues) {
+        return;
+      }
+      for (var i = track.cues.length - 1; track.cues[i].startTime >= pts && i > -1; i--) {
+        track.removeCue(track.cues[i]);
       }
     }
   }, {
@@ -3500,9 +3501,9 @@ var TimelineController = function (_EventHandler) {
 
       // if this is a frag for a previously loaded timerange, remove all captions
       // TODO: consider just removing captions for the timerange
-      if (pts <= this.lastPts) {
-        this.clearCurrentCues(this.textTrack1);
-        this.clearCurrentCues(this.textTrack2);
+      if (pts < this.lastPts) {
+        this.clearCurrentCues(this.textTrack1, pts);
+        this.clearCurrentCues(this.textTrack2, pts);
       }
 
       this.lastPts = pts;
@@ -7306,7 +7307,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-128';
+      return '0.6.1-129';
     }
   }, {
     key: 'Events',

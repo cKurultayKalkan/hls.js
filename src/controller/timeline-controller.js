@@ -55,14 +55,13 @@ class TimelineController extends EventHandler {
     }
   }
 
-  clearCurrentCues(track)
+  clearCurrentCues(track, pts)
   {
-    if (track && track.cues)
-    {
-      while (track.cues.length > 0)
-      {
-        track.removeCue(track.cues[0]);
-      }
+    if (!track || !track.cues) {
+      return;
+    }
+    for (let i=track.cues.length-1; track.cues[i].startTime>=pts && i>-1; i--) {
+      track.removeCue(track.cues[i]);
     }
   }
 
@@ -108,10 +107,10 @@ class TimelineController extends EventHandler {
 
     // if this is a frag for a previously loaded timerange, remove all captions
     // TODO: consider just removing captions for the timerange
-    if (pts <= this.lastPts)
+    if (pts < this.lastPts)
     {
-      this.clearCurrentCues(this.textTrack1);
-      this.clearCurrentCues(this.textTrack2);
+      this.clearCurrentCues(this.textTrack1, pts);
+      this.clearCurrentCues(this.textTrack2, pts);
     }
 
     this.lastPts = pts;
