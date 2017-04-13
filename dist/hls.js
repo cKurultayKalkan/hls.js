@@ -7311,7 +7311,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-131';
+      return '0.6.1-132';
     }
   }, {
     key: 'Events',
@@ -11245,7 +11245,8 @@ var Cues = {
           cue.line = r > 7 ? r - 2 : r + 1;
         }
         cue.align = 'left';
-        cue.position = 100 * (indent / 32) + (navigator.userAgent.match(/Firefox\//) ? 50 : 0);
+        // Clamp the position between 0 and 100 - if out of these bounds, Firefox throws an exception and captions break
+        cue.position = Math.max(0, Math.min(100, 100 * (indent / 32) + (navigator.userAgent.match(/Firefox\//) ? 50 : 0)));
         track.addCue(cue);
       }
     }
