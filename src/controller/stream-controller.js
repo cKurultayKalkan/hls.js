@@ -109,7 +109,7 @@ class StreamController extends EventHandler {
     this.fragParsing = null;
   }
 
-  stopLoad() {
+  stopLoad(stopDemuxer) {
     var frag = this.fragCurrent;
     if (frag) {
       if (frag.loader) {
@@ -122,6 +122,10 @@ class StreamController extends EventHandler {
     if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
       this.fragParsing = frag;
       this.demuxer.waitQueue();
+    }
+    if (stopDemuxer && this.demuxer) {
+      this.demuxer.destroy();
+      this.demuxer = null;
     }
     this.state = State.STOPPED;
   }

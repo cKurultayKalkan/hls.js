@@ -224,10 +224,10 @@ class Hls {
     this.streamController.startLoad(startPosition);
   }
 
-  stopLoad() {
+  stopLoad(stopDemuxer) {
     logger.log('stopLoad');
     this.levelController.stopLoad();
-    this.streamController.stopLoad();
+    this.streamController.stopLoad(stopDemuxer);
   }
 
   clearLevelDetails() {

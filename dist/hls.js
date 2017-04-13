@@ -2056,7 +2056,7 @@ var StreamController = function (_EventHandler) {
     }
   }, {
     key: 'stopLoad',
-    value: function stopLoad() {
+    value: function stopLoad(stopDemuxer) {
       var frag = this.fragCurrent;
       if (frag) {
         if (frag.loader) {
@@ -2069,6 +2069,10 @@ var StreamController = function (_EventHandler) {
       if (this.state === State.PARSING && this.demuxer && this.config.enableWorker) {
         this.fragParsing = frag;
         this.demuxer.waitQueue();
+      }
+      if (stopDemuxer && this.demuxer) {
+        this.demuxer.destroy();
+        this.demuxer = null;
       }
       this.state = State.STOPPED;
     }
@@ -7307,7 +7311,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-129';
+      return '0.6.1-130';
     }
   }, {
     key: 'Events',
@@ -7506,10 +7510,10 @@ var Hls = function () {
     }
   }, {
     key: 'stopLoad',
-    value: function stopLoad() {
+    value: function stopLoad(stopDemuxer) {
       _logger.logger.log('stopLoad');
       this.levelController.stopLoad();
-      this.streamController.stopLoad();
+      this.streamController.stopLoad(stopDemuxer);
     }
   }, {
     key: 'clearLevelDetails',
