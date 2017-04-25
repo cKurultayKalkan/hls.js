@@ -11,7 +11,7 @@ const fakeLogger = {
   error: noop
 };
 
-let exportedLogger = fakeLogger;
+let exportedLogger = fakeLogger, hls;
 
 //let lastCallTime;
 // function formatMsgWithTimeInfo(type, msg) {
@@ -53,12 +53,16 @@ function checkRepeatWrapper(func) {
 
 function exportLoggerFunctions(debugConfig, ...functions) {
   functions.forEach(function(type) {
-    exportedLogger[type] = checkRepeatWrapper(debugConfig[type] ? debugConfig[type].bind(debugConfig) : consolePrintFn(type));
+    exportedLogger[type] = checkRepeatWrapper(function(){
+      let logFn = hls&&hls.holaLog&&hls.holaLog[type] || debugConfig[type] || consolePrintFn(type);
+      logFn.apply(null, arguments);
+    });
   });
 }
 
-export var enableLogs = function(debugConfig) {
+export var enableLogs = function(debugConfig, hlsObject) {
   if (debugConfig === true || typeof debugConfig === 'object') {
+    hls = hlsObject;
     exportLoggerFunctions(debugConfig,
       // Remove out from list here to hard-disable a log-level
       //'trace',

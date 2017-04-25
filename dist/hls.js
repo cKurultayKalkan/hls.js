@@ -7311,7 +7311,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-132';
+      return '0.6.1-133';
     }
   }, {
     key: 'Events',
@@ -7416,7 +7416,7 @@ var Hls = function () {
       throw new Error('Illegal hls.js config: "liveMaxLatencyDuration" must be gt "liveSyncDuration"');
     }
 
-    (0, _logger.enableLogs)(config.debug);
+    (0, _logger.enableLogs)(config.debug, this);
     this.config = config;
     // observer setup
     var observer = this.observer = new _events4.default();
@@ -11276,7 +11276,8 @@ var fakeLogger = {
   error: noop
 };
 
-var exportedLogger = fakeLogger;
+var exportedLogger = fakeLogger,
+    hls = void 0;
 
 //let lastCallTime;
 // function formatMsgWithTimeInfo(type, msg) {
@@ -11330,12 +11331,16 @@ function exportLoggerFunctions(debugConfig) {
   }
 
   functions.forEach(function (type) {
-    exportedLogger[type] = checkRepeatWrapper(debugConfig[type] ? debugConfig[type].bind(debugConfig) : consolePrintFn(type));
+    exportedLogger[type] = checkRepeatWrapper(function () {
+      var logFn = hls && hls.holaLog && hls.holaLog[type] || debugConfig[type] || consolePrintFn(type);
+      logFn.apply(null, arguments);
+    });
   });
 }
 
-var enableLogs = exports.enableLogs = function enableLogs(debugConfig) {
+var enableLogs = exports.enableLogs = function enableLogs(debugConfig, hlsObject) {
   if (debugConfig === true || (typeof debugConfig === 'undefined' ? 'undefined' : _typeof(debugConfig)) === 'object') {
+    hls = hlsObject;
     exportLoggerFunctions(debugConfig,
     // Remove out from list here to hard-disable a log-level
     //'trace',
