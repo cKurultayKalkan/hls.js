@@ -5496,7 +5496,7 @@ var TSDemuxer = function () {
       }
       if (first) {
         this.lastContiguous = !trackSwitch && sn === this.lastSN + 1;
-        this.fragStats = { keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0 };
+        this.fragStats = { framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0 };
         this.remuxAVCCount = this.remuxAACCount = 0;
         this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
         this.fragStartAVCPos = this._avcTrack.samples.length;
@@ -6174,6 +6174,7 @@ var TSDemuxer = function () {
         // only push AVC sample if keyframe already found in this fragment OR
         //    keyframe found in last fragment (track.sps) AND
         //        samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
+        this.fragStats.framesCount++;
         if (key === true || track.sps && (samples.length || this.contiguous)) {
           avcSample = { units: { units: units2, length: length }, pts: pes.pts, dts: pes.dts, key: key };
           if (key) {
@@ -7311,7 +7312,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-134';
+      return '0.6.1-135';
     }
   }, {
     key: 'Events',
