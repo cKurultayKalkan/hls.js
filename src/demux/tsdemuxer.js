@@ -28,19 +28,22 @@
     this._setEmptyTracks();
     this._clearAllData();
     this.remuxer = new this.remuxerClass(observer, config, typeSupported);
+    this.levelParams = {};
   }
 
-  _setEmptyTracks() {
+  _setEmptyTracks(clearParams) {
     let track;
     if ((track = this._avcTrack)) {
-      if (track.sps) {
-        track.savedSps = track.sps;
-      }
-      if (track.pps) {
-        track.savedPps = track.pps;
-      }
+      let params = {};
+      let oldParams = this.levelParams[this.lastLevel] || {};
+      params.sps = track.sps || oldParams.sps;
+      params.pps = track.pps || oldParams.pps;
     }
-    this._avcTrack = Object.assign({}, this._avcTrack, {container : 'video/mp2t', type: 'video', samples : [], len : 0, nbNalu : 0, sps: undefined, pps: undefined});
+    this._avcTrack = Object.assign({}, this._avcTrack, {container : 'video/mp2t', type: 'video', samples : [], len : 0, nbNalu : 0});
+    if (clearParams) {
+      delete this._avcTrack.sps;
+      delete this._avcTrack.pps;
+    }
     this._aacTrack = Object.assign({}, this._aacTrack, {container : 'video/mp2t', type: 'audio', samples : [], len : 0, isAAC: true});
     this._id3Track = Object.assign({}, this._id3Track, {type: 'id3', samples : [], len : 0});
     this._txtTrack = Object.assign({}, this._txtTrack, {type: 'text', samples: [], len: 0});
@@ -66,7 +69,7 @@
     }
     this.pmtParsed = false;
     this._pmtId = -1;
-    this._setEmptyTracks();
+    this._setEmptyTracks(true);
     this._clearAllData();
     this._clearIDs();
     // flush any partial content
@@ -75,8 +78,8 @@
     this.remuxer.switchLevel();
   }
 
-  _clearAvcData(){
-    return (this._avcData = {data: [], size: 0});
+  _clearAvcData(offset){
+    return (this._avcData = {data: [], size: 0, offset: offset||0});
   }
 
   _clearAacData(){
@@ -106,6 +109,7 @@
     this.audioCodec = audioCodec;
     this.videoCodec = videoCodec;
     this.timeOffset = timeOffset;
+    this.lastAVCFrameStart = 0;
     this.accurate = accurate;
     this._duration = duration;
     this.contiguous = false;
@@ -134,7 +138,7 @@
     }
     if (first) {
       this.lastContiguous = !trackSwitch && sn === this.lastSN+1;
-      this.fragStats = {framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0};
+      this.fragStats = {framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: {pmt: {}, idr: [], indr: [], sei: []}};
       this.remuxAVCCount = this.remuxAACCount = 0;
       this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
       this.fragStartAVCPos = this._avcTrack.samples.length;
@@ -181,7 +185,8 @@
                   }
                 }
               }
-              avcData = this._clearAvcData();
+              this.lastAVCFrameStart = start;
+              avcData = this._clearAvcData(start);
             }
             avcData.data.push(data.subarray(offset, start + 188));
             avcData.size += start + 188 - offset;
@@ -421,6 +426,7 @@
   _parsePAT(data, offset) {
     // skip the PSI header and parse the first PMT entry
     this._pmtId  = (data[offset + 10] & 0x1F) << 8 | data[offset + 11];
+    this.fragStats.keymap.pmtId = this._pmtId;
     //logger.log('PMT PID:'  + this._pmtId);
   }
 
@@ -441,6 +447,7 @@
           //logger.log('AAC PID:'  + pid);
           if (this._aacTrack.id === -1) {
             this._aacTrack.id = pid;
+            this.fragStats.keymap.pmt.aac = pid;
           }
           break;
         // Packetized metadata (ID3)
@@ -448,6 +455,7 @@
           //logger.log('ID3 PID:'  + pid);
           if (this._id3Track.id === -1) {
             this._id3Track.id = pid;
+            this.fragStats.keymap.pmt.id3 = pid;
           }
           break;
         // ITU-T Rec. H.264 and ISO/IEC 14496-10 (lower bit-rate video)
@@ -455,6 +463,7 @@
           //logger.log('AVC PID:'  + pid);
           if  (this._avcTrack.id === -1) {
             this._avcTrack.id = pid;
+            this.fragStats.keymap.pmt.avc = pid;
           }
           break;
         // ISO/IEC 11172-3 (MPEG-1 audio)
@@ -467,6 +476,7 @@
           } else {
             if (this._aacTrack.id === -1) {
               this._aacTrack.id = pid;
+              this.fragStats.keymap.pmt.mpg = pid;
             }
             this._aacTrack.isAAC = false;
           }
@@ -618,7 +628,7 @@
           }
           // retrieve slice type by parsing beginning of NAL unit (follow H264 spec, slice_header definition) to detect keyframe embedded in NDR
           let data = unit.data;
-          if (data.length > 1) {
+          if (data.length > 4) {
             let sliceType = new ExpGolomb(data).readSliceType();
             // 2 : I slice, 4 : SI slice, 7 : I slice, 9: SI slice
             // SI slice : A slice that is coded using intra prediction only and using quantisation of the prediction samples.
@@ -627,6 +637,7 @@
             //if (sliceType === 2 || sliceType === 7) {
             if (sliceType === 2 || sliceType === 4 || sliceType === 7 || sliceType === 9) {
               key = true;
+              this.fragStats.keymap.indr.push(this.lastAVCFrameStart);
             }
           }
           break;
@@ -637,6 +648,7 @@
             debugString += 'IDR ';
           }
           key = true;
+          this.fragStats.keymap.idr.push(this.lastAVCFrameStart);
           break;
         //SEI
         case 6:
@@ -668,15 +680,9 @@
             } while (b === 0xFF);
 
             // if SEI recovery_point has been found mark as keyframe
-            if (!hlsConfig.disableSEIkeyframes) {
-                key = key || payloadType === 6;
-            }
-
-            if (key && !track.sps && track.savedSps) {
-              track.sps = track.savedSps;
-              if (!track.pps && track.savedPps) {
-                track.pps = track.savedPps;
-              }
+            if (!hlsConfig.disableSEIkeyframes && payloadType === 6) {
+                key = true;
+                this.fragStats.keymap.sei.push(this.lastAVCFrameStart);
             }
 
             // TODO: there can be more than one payload in an SEI packet...
@@ -732,13 +738,12 @@
           if(debug) {
             debugString += 'SPS ';
           }
-          if(!track.sps || track.sps === track.savedSps) {
-            track.savedSps = undefined;
+          if(!track.sps) {
             expGolombDecoder = new ExpGolomb(unit.data);
             var config = expGolombDecoder.readSPS();
             track.width = config.width;
             track.height = config.height;
-            track.sps = [unit.data];
+            this.fragStats.keymap.sps = track.sps = [unit.data];
             track.duration = this._duration;
             var codecarray = unit.data.subarray(1, 4);
             var codecstring = 'avc1.';
@@ -758,9 +763,8 @@
           if(debug) {
             debugString += 'PPS ';
           }
-          if (!track.pps || track.pps === track.savedPps) {
-            track.savedPps = undefined;
-            track.pps = [unit.data];
+          if (!track.pps) {
+            this.fragStats.keymap.pps = track.pps = [unit.data];
           }
           break;
         case 9:
@@ -786,6 +790,11 @@
     if(debug || debugString.length) {
       logger.log(debugString);
     }
+    if (key && this.levelParams[this.lastLevel]) {
+      track.sps = track.sps || this.levelParams[this.lastLevel].sps || undefined;
+      track.pps = track.pps || this.levelParams[this.lastLevel].pps || undefined;
+    }
+
     //build sample from PES
     // Annex B to MP4 conversion to be done
     if (units2.length) {

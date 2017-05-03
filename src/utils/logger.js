@@ -61,26 +61,21 @@ function exportLoggerFunctions(debugConfig, ...functions) {
 }
 
 export var enableLogs = function(debugConfig, hlsObject) {
-  if (debugConfig === true || typeof debugConfig === 'object') {
-    hls = hlsObject;
-    exportLoggerFunctions(debugConfig,
-      // Remove out from list here to hard-disable a log-level
-      //'trace',
-      'debug',
-      'log',
-      'info',
-      'warn',
-      'error'
-    );
-    // Some browsers don't allow to use bind on console object anyway
-    // fallback to default if needed
-    try {
-      exportedLogger.log();
-    } catch (e) {
-      exportedLogger = fakeLogger;
-    }
-  }
-  else {
+  hls = hlsObject;
+  exportLoggerFunctions(debugConfig || fakeLogger,
+    // Remove out from list here to hard-disable a log-level
+    //'trace',
+    'debug',
+    'log',
+    'info',
+    'warn',
+    'error'
+  );
+  // Some browsers don't allow to use bind on console object anyway
+  // fallback to default if needed
+  try {
+    exportedLogger.log();
+  } catch (e) {
     exportedLogger = fakeLogger;
   }
 };
