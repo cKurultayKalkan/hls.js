@@ -7311,7 +7311,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-133';
+      return '0.6.1-134';
     }
   }, {
     key: 'Events',
@@ -7538,6 +7538,11 @@ var Hls = function () {
 
     /** Return all quality levels **/
 
+  }, {
+    key: 'setLogs',
+    value: function setLogs(debug) {
+      (0, _logger.enableLogs)(debug, this);
+    }
   }, {
     key: 'levels',
     get: function get() {

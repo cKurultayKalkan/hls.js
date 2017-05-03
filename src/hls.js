@@ -347,6 +347,10 @@ class Hls {
   get manualLevel() {
     return this.levelController.manualLevel;
   }
+
+  setLogs(debug) {
+    enableLogs(debug, this);
+  }
 }
 
 Hls.api = new EventEmitter();
