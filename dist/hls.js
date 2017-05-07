@@ -5417,7 +5417,8 @@ var TSDemuxer = function () {
       this._clearIDs();
       // flush any partial content
       this.aacOverFlow = null;
-      this.lastAacPTS = null;
+      this.aacLastPTS = null;
+      this.avcNaluState = 0;
       this.remuxer.switchLevel();
     }
   }, {
@@ -6003,6 +6004,36 @@ var TSDemuxer = function () {
       pes.data = null;
       var debugString = '';
 
+      var pushAccessUnit = function pushAccessUnit() {
+        //build sample from PES
+        // Annex B to MP4 conversion to be done
+        if (units2.length) {
+          // only push AVC sample if keyframe already found in this fragment OR
+          //    keyframe found in last fragment (track.sps) AND
+          //        samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
+          this.fragStats.framesCount++;
+          if (key === true || track.sps && (samples.length || this.contiguous)) {
+            avcSample = { units: { units: units2, length: length }, pts: pes.pts, dts: pes.dts, key: key };
+            if (key) {
+              this.fragStats.keyFrames++;
+            }
+            //logger.log(`avcSample ${units2.length} ${length} ${pes.dts} ${key}`);
+            samples.push(avcSample);
+            track.len += length;
+            track.nbNalu += units2.length;
+          } else {
+            this.fragStats.dropped++;
+          }
+          if (this.firstSample && !key) {
+            this.fragStats.notFirstKeyframe++;
+          }
+          this.firstSample = false;
+          units2 = [];
+          length = 0;
+        }
+      };
+      pushAccessUnit = pushAccessUnit.bind(this);
+
       units.forEach(function (unit) {
         switch (unit.type) {
           //NDR
@@ -6154,6 +6185,7 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'AUD ';
             }
+            pushAccessUnit();
             break;
           // Filler Data
           case 12:
@@ -6176,31 +6208,7 @@ var TSDemuxer = function () {
         track.sps = track.sps || this.levelParams[this.lastLevel].sps || undefined;
         track.pps = track.pps || this.levelParams[this.lastLevel].pps || undefined;
       }
-
-      //build sample from PES
-      // Annex B to MP4 conversion to be done
-      if (units2.length) {
-        // only push AVC sample if keyframe already found in this fragment OR
-        //    keyframe found in last fragment (track.sps) AND
-        //        samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
-        this.fragStats.framesCount++;
-        if (key === true || track.sps && (samples.length || this.contiguous)) {
-          avcSample = { units: { units: units2, length: length }, pts: pes.pts, dts: pes.dts, key: key };
-          if (key) {
-            this.fragStats.keyFrames++;
-          }
-          // logger.log(`avcSample ${units2.length} ${length} ${pes.dts} ${key}`);
-          samples.push(avcSample);
-          track.len += length;
-          track.nbNalu += units2.length;
-        } else {
-          this.fragStats.dropped++;
-        }
-        if (this.firstSample && !key) {
-          this.fragStats.notFirstKeyframe++;
-        }
-        this.firstSample = false;
-      }
+      pushAccessUnit();
     }
   }, {
     key: '_insertSampleInOrder',
@@ -6228,7 +6236,7 @@ var TSDemuxer = function () {
           len = array.byteLength,
           value,
           overflow,
-          state = 0;
+          state = this.avcNaluState;
       var units = [],
           unit,
           unitType,
@@ -6263,22 +6271,45 @@ var TSDemuxer = function () {
                 //logger.log('pushing NALU, type/size:' + unit.type + '/' + unit.data.byteLength);
                 units.push(unit);
               } else {
-                // If NAL units are not starting right at the beginning of the PES packet, push preceding data into previous NAL unit.
-                overflow = i - state - 1;
-                if (overflow) {
+                // lastUnitStart is undefined => this is the first start code found in this PES packet
+                // first check if start code delimiter is overlapping between 2 PES packets,
+                // ie it started in last packet (lastState not zero)
+                // and ended at the beginning of this PES packet (i <= 4 - lastState)
+                var lastState = this.avcNaluState;
+                if (lastState && i <= 4 - lastState) {
+                  // start delimiter overlapping between PES packets
+                  // strip start delimiter bytes from the end of last NAL unit
                   var track = this._avcTrack,
                       samples = track.samples;
-                  //logger.log('first NALU found with overflow:' + overflow);
                   if (samples.length) {
                     var lastavcSample = samples[samples.length - 1],
                         lastUnits = lastavcSample.units.units,
-                        lastUnit = lastUnits[lastUnits.length - 1],
-                        tmp = new Uint8Array(lastUnit.data.byteLength + overflow);
-                    tmp.set(lastUnit.data, 0);
-                    tmp.set(array.subarray(0, overflow), lastUnit.data.byteLength);
-                    lastUnit.data = tmp;
-                    lastavcSample.units.length += overflow;
-                    track.len += overflow;
+                        lastUnit = lastUnits[lastUnits.length - 1];
+                    // check if lastUnit had a state different from zero
+                    if (lastUnit.state) {
+                      // strip last bytes
+                      lastUnit.data = lastUnit.data.subarray(0, lastUnit.data.byteLength - lastState);
+                      lastavcSample.units.length -= lastState;
+                      track.len -= lastState;
+                    }
+                  }
+                }
+                // If NAL units are not starting right at the beginning of the PES packet, push preceding data into previous NAL unit.
+                overflow = i - state - 1;
+                if (overflow > 0) {
+                  var _track = this._avcTrack,
+                      _samples = _track.samples;
+                  //logger.log('first NALU found with overflow:' + overflow);
+                  if (_samples.length) {
+                    var _lastavcSample = _samples[_samples.length - 1],
+                        _lastUnits = _lastavcSample.units.units,
+                        _lastUnit = _lastUnits[_lastUnits.length - 1],
+                        tmp = new Uint8Array(_lastUnit.data.byteLength + overflow);
+                    tmp.set(_lastUnit.data, 0);
+                    tmp.set(array.subarray(0, overflow), _lastUnit.data.byteLength);
+                    _lastUnit.data = tmp;
+                    _lastavcSample.units.length += overflow;
+                    _track.len += overflow;
                   }
                 }
               }
@@ -6294,9 +6325,10 @@ var TSDemuxer = function () {
         }
       }
       if (lastUnitStart) {
-        unit = { data: array.subarray(lastUnitStart, len), type: lastUnitType };
+        unit = { data: array.subarray(lastUnitStart, len), type: lastUnitType, state: state };
         units.push(unit);
-        //logger.log('pushing NALU, type/size:' + unit.type + '/' + unit.data.byteLength);
+        //logger.log('pushing NALU, type/size/state:' + unit.type + '/' + unit.data.byteLength + '/' + state);
+        this.avcNaluState = state;
       }
       return units;
     }
@@ -6356,7 +6388,7 @@ var TSDemuxer = function () {
           duration = this._duration,
           audioCodec = this.audioCodec,
           aacOverFlow = this.aacOverFlow,
-          lastAacPTS = this.lastAacPTS,
+          aacLastPTS = this.aacLastPTS,
           config,
           frameLength,
           frameDuration,
@@ -6408,8 +6440,8 @@ var TSDemuxer = function () {
 
       // if last AAC frame is overflowing, we should ensure timestamps are contiguous:
       // first sample PTS should be equal to last sample PTS + frameDuration
-      if (aacOverFlow && lastAacPTS) {
-        var newPTS = lastAacPTS + frameDuration;
+      if (aacOverFlow && aacLastPTS) {
+        var newPTS = aacLastPTS + frameDuration;
         if (Math.abs(newPTS - pts) > 1) {
           _logger.logger.log('AAC: align PTS for overlapping frames by ' + Math.round((newPTS - pts) / 90));
           pts = newPTS;
@@ -6449,7 +6481,7 @@ var TSDemuxer = function () {
         aacOverFlow = null;
       }
       this.aacOverFlow = aacOverFlow;
-      this.lastAacPTS = stamp;
+      this.aacLastPTS = stamp;
     }
   }, {
     key: '_parseMPEGPES',
@@ -7321,7 +7353,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-136';
+      return '0.6.1-137';
     }
   }, {
     key: 'Events',
