@@ -41,7 +41,7 @@ var DemuxerWorker = function (self) {
   });
 
   observer.on(Event.FRAG_PARSING_DATA, function(ev, data) {
-    var objData = {event: ev, type: data.type, startPTS: data.startPTS, endPTS: data.endPTS, startDTS: data.startDTS, endDTS: data.endDTS, data1: data.data1.buffer, data2: data.data2.buffer, nb: data.nb, dropped : data.dropped, deltaPTS: data.deltaPTS};
+    var objData = {event: ev, type: data.type, startPTS: data.startPTS, endPTS: data.endPTS, startDTS: data.startDTS, endDTS: data.endDTS, data1: data.data1.buffer, data2: data.data2.buffer, nb: data.nb, dropped : data.dropped, deltaPTS: data.deltaPTS, isPartial: data.isPartial};
     // pass data1/data2 as transferable object (no copy)
     self.postMessage(objData, [objData.data1, objData.data2]);
   });

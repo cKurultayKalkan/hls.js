@@ -417,23 +417,25 @@ class StreamController extends EventHandler {
     }
     if (foundFrag) {
       frag = foundFrag;
-      start = foundFrag.start;
+      const curSNIdx = frag.sn - levelDetails.startSN;
+      const sameLevel = fragPrevious && frag.level === fragPrevious.level;
+      const prevFrag = fragments[curSNIdx - 1];
+      const nextFrag = fragments[curSNIdx + 1];
       logger.log('find SN matching with pos:' +  bufferEnd + ':' + frag.sn);
-      if (fragPrevious && frag.sn === fragPrevious.sn) {
+      if (sameLevel && frag.sn === fragPrevious.sn) {
         if (frag.sn < levelDetails.endSN) {
-          let deltaPTS = fragPrevious.deltaPTS,
-          curSNIdx = frag.sn - levelDetails.startSN;
+          let deltaPTS = fragPrevious.deltaPTS;
           // if there is a significant delta between audio and video, larger than max allowed hole,
           // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
           // let's try to load previous fragment again to get last keyframe
           // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
           if (this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !BufferHelper.isBuffered(media, bufferEnd))) {
-            frag = fragments[curSNIdx-1];
+            frag = prevFrag;
             logger.warn(`SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this`);
             // decrement previous frag load counter to avoid frag loop loading error when next fragment will get reloaded
             fragPrevious.loadCounter--;
           } else {
-            frag = fragments[curSNIdx+1];
+            frag = nextFrag;
             logger.log(`SN just loaded, load next one: ${frag.sn}`);
           }
         } else {
@@ -449,6 +451,25 @@ class StreamController extends EventHandler {
             }
           }
           frag = null;
+        }
+      } else if (frag.dropped && !sameLevel) {
+        // Only backtrack a max of 1 consecutive fragment to prevent sliding back too far when little or no frags start with keyframes
+        if (nextFrag && nextFrag.backtracked) {
+          logger.warn(`Already backtracked from fragment ${curSNIdx + 1}, will not backtrack to fragment ${curSNIdx}. Loading fragment ${curSNIdx + 1}`);
+          frag = nextFrag;
+        } else {
+          // If a fragment has dropped frames and it's in a different level/sequence, load the previous fragment to try and find the keyframe
+          // Reset the dropped count now since it won't be reset until we parse the fragment again, which prevents infinite backtracking on the same segment
+          logger.warn('Loaded fragment with dropped frames, backtracking 1 segment to find a keyframe');
+          frag.dropped = 0;
+          if (prevFrag) {
+            if (prevFrag.loadCounter) {
+              prevFrag.loadCounter--;
+            }
+            frag = prevFrag;
+          } else {
+            frag = null;
+          }
         }
       }
     }
@@ -712,6 +733,7 @@ class StreamController extends EventHandler {
           if(level.details) {
             level.details.fragments.forEach(fragment => {
               fragment.loadCounter = undefined;
+              fragment.backtracked = undefined;
             });
           }
       });
@@ -1042,6 +1064,25 @@ class StreamController extends EventHandler {
             frag.deltaPTS = data.deltaPTS;
           } else {
             frag.deltaPTS = Math.max(data.deltaPTS, frag.deltaPTS);
+          }
+        }
+        if (!this.levels[this.level].details.live && !data.isPartial) {
+          if (frag.dropped) {
+            if (!frag.backtracked) {
+              // Return back to the IDLE state without appending to buffer
+              // Causes findFragments to backtrack a segment and find the keyframe
+              // Audio fragments arriving before video sets the nextLoadPosition, causing _findFragments to skip the backtracked fragment
+              frag.backtracked = true;
+              this.nextLoadPosition = data.startPTS;
+              this.state = State.IDLE;
+              this.tick();
+              return;
+            } else {
+              logger.warn('Already backtracked on this fragment, appending with the gap');
+            }
+          } else {
+            // Only reset the backtracked flag if we've loaded the frag without any dropped frames
+            frag.backtracked = false;
           }
         }
       }
