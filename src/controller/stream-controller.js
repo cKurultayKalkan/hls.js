@@ -1072,13 +1072,17 @@ class StreamController extends EventHandler {
             frag.deltaPTS = Math.max(data.deltaPTS, frag.deltaPTS);
           }
         }
-        if (!this.levels[this.level].details.live && !data.isPartial) {
+        let details = this.levels[frag.level].details;
+        if (!details.live && !data.isPartial) {
+          const curSNIdx = frag.sn - details.startSN;
+          let detFrag = details.fragments[curSNIdx];
           if (frag.dropped) {
-            if (!frag.backtracked) {
+            detFrag.dropped = frag.dropped;
+            if (!detFrag.backtracked) {
               // Return back to the IDLE state without appending to buffer
               // Causes findFragments to backtrack a segment and find the keyframe
               // Audio fragments arriving before video sets the nextLoadPosition, causing _findFragments to skip the backtracked fragment
-              frag.backtracked = true;
+              frag.backtracked = detFrag.backtracked = true;
               this.nextLoadPosition = data.startPTS;
               this.state = State.IDLE;
               this.tick();
@@ -1088,7 +1092,7 @@ class StreamController extends EventHandler {
             }
           } else {
             // Only reset the backtracked flag if we've loaded the frag without any dropped frames
-            frag.backtracked = false;
+            frag.backtracked = detFrag.backtracked = false;
           }
         }
       }
