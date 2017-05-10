@@ -1832,6 +1832,18 @@ var LevelController = function (_EventHandler) {
           this.timer = null;
         }
       }
+
+      if (this.hls.config.levelsPreload && !data.details.live) {
+        // Preload next not already loaded level
+        for (var i = 0; i < this._levels.length; i++) {
+          var level = this._levels[i];
+          if (data.level !== i && !level.details) {
+            _logger.logger.log('preloading playlist for level ' + i);
+            this.hls.trigger(_events2.default.LEVEL_LOADING, { url: level.url[level.urlId], level: i, id: level.urlId, preload: true });
+            return;
+          }
+        }
+      }
     }
   }, {
     key: 'tick',
@@ -2814,6 +2826,7 @@ var StreamController = function (_EventHandler) {
     value: function onLevelLoaded(data) {
       var newDetails = data.details,
           newLevelId = data.level,
+          levelPreload = data.preload,
           curLevel = this.levels[newLevelId],
           duration = newDetails.totalduration,
           sliding = 0,
@@ -2854,6 +2867,11 @@ var StreamController = function (_EventHandler) {
       this.levelLastLoaded = newLevelId;
       curLevel.details = newDetails;
       this.hls.trigger(_events2.default.LEVEL_UPDATED, { details: newDetails, level: newLevelId });
+
+      // if just a preload, stop here
+      if (levelPreload) {
+        return;
+      }
 
       // compute start position
       if (this.startFragRequested === false) {
@@ -7395,7 +7413,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-139';
+      return '0.6.1-140';
     }
   }, {
     key: 'Events',
@@ -8060,7 +8078,7 @@ var PlaylistLoader = function (_EventHandler) {
   }, {
     key: 'onLevelLoading',
     value: function onLevelLoading(data) {
-      this.load(data.url, data.level, data.id);
+      this.load(data.url, data.level, data.id, data.preload);
     }
   }, {
     key: 'reloadCurrentRequests',
@@ -8074,7 +8092,7 @@ var PlaylistLoader = function (_EventHandler) {
     }
   }, {
     key: 'load',
-    value: function load(url, id1, id2) {
+    value: function load(url, id1, id2, preload) {
       var config = this.hls.config,
           retry,
           timeout,
@@ -8082,7 +8100,8 @@ var PlaylistLoader = function (_EventHandler) {
 
       if (this.loading && this.loader) {
         if (this.url === url && this.id === id1 && this.id2 === id2) {
-          // same request than last pending one, don't do anything
+          // same request than last pending one, don't do anything, except, maybe, preloading status
+          this.preload = preload;
           return;
         } else {
           // one playlist load request is pending, but with different params, abort it before loading new playlist
@@ -8093,6 +8112,7 @@ var PlaylistLoader = function (_EventHandler) {
       this.url = url;
       this.id = id1;
       this.id2 = id2;
+      this.preload = preload;
       if (this.id === null) {
         retry = config.manifestLoadingMaxRetry;
         timeout = config.manifestLoadingTimeOut;
@@ -8355,6 +8375,7 @@ var PlaylistLoader = function (_EventHandler) {
           url = target.responseURL,
           id = this.id,
           id2 = this.id2,
+          preload = this.preload,
           hls = this.hls,
           levels;
 
@@ -8377,7 +8398,7 @@ var PlaylistLoader = function (_EventHandler) {
           } else {
             var levelDetails = this.parseLevelPlaylist(string, url, id);
             stats.tparsed = performance.now();
-            hls.trigger(_events2.default.LEVEL_LOADED, { details: levelDetails, level: id, id: id2, stats: stats });
+            hls.trigger(_events2.default.LEVEL_LOADED, { details: levelDetails, level: id, id: id2, preload: preload, stats: stats });
           }
         } else {
           levels = this.parseMasterPlaylist(string, url);

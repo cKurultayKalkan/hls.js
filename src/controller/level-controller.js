@@ -296,6 +296,18 @@ class LevelController extends EventHandler {
         this.timer = null;
       }
     }
+
+    if (this.hls.config.levelsPreload && !data.details.live) {
+      // Preload next not already loaded level
+      for (let i = 0; i < this._levels.length; i++) {
+        let level = this._levels[i];
+        if (data.level !== i && !level.details) {
+          logger.log(`preloading playlist for level ${i}`);
+          this.hls.trigger(Event.LEVEL_LOADING, {url: level.url[level.urlId], level: i, id: level.urlId, preload: true});
+          return;
+        }
+      }
+    }
   }
 
   tick() {

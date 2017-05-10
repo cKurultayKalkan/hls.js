@@ -853,6 +853,7 @@ class StreamController extends EventHandler {
   onLevelLoaded(data) {
     var newDetails = data.details,
         newLevelId = data.level,
+        levelPreload = data.preload,
         curLevel = this.levels[newLevelId],
         duration = newDetails.totalduration,
         sliding = 0,
@@ -893,6 +894,11 @@ class StreamController extends EventHandler {
     this.levelLastLoaded = newLevelId;
     curLevel.details = newDetails;
     this.hls.trigger(Event.LEVEL_UPDATED, { details: newDetails, level: newLevelId });
+
+    // if just a preload, stop here
+    if (levelPreload) {
+      return;
+    }
 
     // compute start position
     if (this.startFragRequested === false) {

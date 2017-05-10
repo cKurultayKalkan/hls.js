@@ -31,7 +31,7 @@ class PlaylistLoader extends EventHandler {
   }
 
   onLevelLoading(data) {
-    this.load(data.url, data.level, data.id);
+    this.load(data.url, data.level, data.id, data.preload);
   }
 
   reloadCurrentRequests() {
@@ -43,7 +43,7 @@ class PlaylistLoader extends EventHandler {
     }
   }
 
-  load(url, id1, id2) {
+  load(url, id1, id2, preload) {
     var config = this.hls.config,
         retry,
         timeout,
@@ -51,7 +51,8 @@ class PlaylistLoader extends EventHandler {
 
     if (this.loading && this.loader) {
       if (this.url === url && this.id === id1 && this.id2 === id2) {
-        // same request than last pending one, don't do anything
+        // same request than last pending one, don't do anything, except, maybe, preloading status
+        this.preload = preload;
         return;
       } else {
         // one playlist load request is pending, but with different params, abort it before loading new playlist
@@ -62,6 +63,7 @@ class PlaylistLoader extends EventHandler {
     this.url = url;
     this.id = id1;
     this.id2 = id2;
+    this.preload = preload;
     if(this.id === null) {
       retry = config.manifestLoadingMaxRetry;
       timeout = config.manifestLoadingTimeOut;
@@ -296,6 +298,7 @@ class PlaylistLoader extends EventHandler {
         url = target.responseURL,
         id = this.id,
         id2 = this.id2,
+        preload = this.preload,
         hls = this.hls,
         levels;
 
@@ -318,7 +321,7 @@ class PlaylistLoader extends EventHandler {
         } else {
           var levelDetails = this.parseLevelPlaylist(string, url, id);
           stats.tparsed = performance.now();
-          hls.trigger(Event.LEVEL_LOADED, {details: levelDetails, level: id, id: id2, stats: stats});
+          hls.trigger(Event.LEVEL_LOADED, {details: levelDetails, level: id, id: id2, preload: preload, stats: stats});
         }
       } else {
         levels = this.parseMasterPlaylist(string, url);
