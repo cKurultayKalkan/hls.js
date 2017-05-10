@@ -340,46 +340,44 @@
   remux(data, final, flush, lastSegment) {
     var _saveAVCSamples = [], _saveAACSamples = [], _saveID3Samples = [],
         _saveTextSamples = [], maxk, samples = this._avcTrack.samples,
-        startPTS, endPTS, gopEndDTS, initDTS;
+        segStartDTS, segEndDTS, gopEndDTS, initDTS;
     let timescale = this.remuxer.PES_TIMESCALE;
     if (samples.length && final) {
-      this.fragStats.PTSDTSshift = ((this.fragStartPts === undefined ? samples[0].pts : this.fragStartPts)-(this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts))/timescale;
       initDTS = this.remuxer._initDTS === undefined ?
         samples[0].dts -timescale * this.timeOffset : this.remuxer._initDTS;
       let startDTS = Math.max(this.remuxer._PTSNormalize((this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS) - initDTS,this.nextAvcDts),0);
       let sample = samples[samples.length-1];
-      let videoStartPTS = Math.max(this.remuxer._PTSNormalize((this.fragStartPts === undefined ? samples[0].pts : this.fragStartPts) - initDTS,this.nextAvcDts),0)/timescale;
-      let videoEndPTS = Math.max(this.remuxer._PTSNormalize(sample.pts - initDTS,this.nextAvcDts),0)/timescale;
+      let videoStartDTS = Math.max(this.remuxer._PTSNormalize((this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts) - initDTS, this.nextAvcDts),0)/timescale;
+      let videoEndDTS = Math.max(this.remuxer._PTSNormalize(sample.dts - initDTS,this.nextAvcDts),0)/timescale;
       if (this.accurate && Math.abs(startDTS-this.nextAvcDts)>90) {
-        videoStartPTS -= (startDTS-this.nextAvcDts)/timescale;
+        videoStartDTS -= (startDTS-this.nextAvcDts)/timescale;
       }
       if ((samples.length+this.remuxAVCCount)>this.fragStartAVCPos+1 && this.fragStartDts !== undefined) {
         var fragStartDts = this.remuxer._PTSNormalize(this.fragStartDts, this.nextAvcDts);
         var sampleDts = this.remuxer._PTSNormalize(sample.dts, this.nextAvcDts);
-        videoEndPTS += (sampleDts - fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
+        videoEndDTS += (sampleDts - fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
       }
-      startPTS = videoStartPTS;
-      endPTS = videoEndPTS;
+      segStartDTS = videoStartDTS;
+      segEndDTS = videoEndDTS;
       if (this._aacTrack.audiosamplerate) {
         let expectedSampleDuration = 1024/this._aacTrack.audiosamplerate;
         let remuxAACCount = this._aacTrack.samples.length;
-        let nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale : (this.accurate ? this.timeOffset : startPTS);
-        startPTS = Math.max(startPTS, nextAacPTS+(this.fragStartAACPos-this.remuxAACCount)*expectedSampleDuration);
+        let nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale : (this.accurate ? this.timeOffset : segStartDTS);
+        segStartDTS = Math.max(segStartDTS, nextAacPTS+(this.fragStartAACPos-this.remuxAACCount)*expectedSampleDuration);
         if (remuxAACCount) {
-          endPTS = Math.min(endPTS, nextAacPTS+expectedSampleDuration*remuxAACCount);
+          segEndDTS = Math.min(segEndDTS, nextAacPTS+expectedSampleDuration*remuxAACCount);
         }
         let AVUnsync;
-        if ((AVUnsync = endPTS-startPTS+videoStartPTS-videoEndPTS)>0.2) {
+        if ((AVUnsync = segEndDTS-segStartDTS+videoStartDTS-videoEndDTS)>0.2) {
           this.fragStats.AVUnsync = AVUnsync;
         }
       }
-      // console.log(`parsed total ${startPTS}/${endPTS} video ${videoStartPTS}/${videoEndPTS} shift ${this.fragStats.PTSDTSshift}`);
     }
     if (!flush) {
       // save samples and break by GOP
       for (maxk=samples.length-1; maxk>0; maxk--) {
         if (samples[maxk].key) {
-          if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < startPTS) {
+          if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < segStartDTS) {
             maxk = 0;
           }
           break;
@@ -414,7 +412,7 @@
     //notify end of parsing
     if (final) {
       let lastGopPTS = Math.min(this.remuxer.nextAvcDts, this.remuxer.nextAacPts)/timescale;
-      this.observer.trigger(Event.FRAG_PARSED, {startPTS: startPTS, endPTS: endPTS, PTSDTSshift: this.fragStats.PTSDTSshift, lastGopPTS: lastGopPTS});
+      this.observer.trigger(Event.FRAG_PARSED, {startPTS: segStartDTS, endPTS: segEndDTS, lastGopPTS: lastGopPTS});
     }
   }
 

@@ -173,6 +173,7 @@ class PlaylistLoader extends EventHandler {
   }
 
   parseLevelPlaylist(string, baseurl, id) {
+    this.hls.config = this.hls.config||{};
     var currentSN = 0,
         fragdecryptdata,
         totalduration = 0,
@@ -183,6 +184,7 @@ class PlaylistLoader extends EventHandler {
         frag = null,
         result,
         regexp,
+        minDuration = (this.hls.config.maxFragLookUpTolerance||0.2)+0.001,
         byteRangeEndOffset,
         byteRangeStartOffset,
         tagList = [];
@@ -227,11 +229,12 @@ class PlaylistLoader extends EventHandler {
         case 'INF':
           var duration = parseFloat(result[1]);
           if (!isNaN(duration)) {
+            minDuration = Math.min(duration, minDuration);
             var sn = currentSN++;
             fragdecryptdata = this.fragmentDecryptdataFromLevelkey(levelkey, sn);
             var url = result[2] ? this.resolve(result[2], baseurl) : null;
             tagList.push(result.map(function(e){ return (' '+e).slice(1); }));
-            frag = {url: url, duration: duration, start: totalduration, sn: sn, level: id, cc: cc, byteRangeStartOffset: byteRangeStartOffset, byteRangeEndOffset: byteRangeEndOffset, decryptdata : fragdecryptdata, programDateTime: programDateTime, tagList: tagList, PTSDTSshift: 0};
+            frag = {url: url, duration: duration, start: totalduration, sn: sn, level: id, cc: cc, byteRangeStartOffset: byteRangeStartOffset, byteRangeEndOffset: byteRangeEndOffset, decryptdata : fragdecryptdata, programDateTime: programDateTime, tagList: tagList};
             level.fragments.push(frag);
             totalduration += duration;
             byteRangeStartOffset = null;
@@ -289,6 +292,7 @@ class PlaylistLoader extends EventHandler {
     level.totalduration = totalduration;
     level.averagetargetduration = totalduration / level.fragments.length;
     level.endSN = currentSN - 1;
+    this.hls.config.maxFragLookUpTolerance = Math.max(minDuration-0.001, 0);
     return level;
   }
 

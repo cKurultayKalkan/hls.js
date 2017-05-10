@@ -99,7 +99,7 @@ import Event from '../events';
     this.remuxer.remux(this._aacTrack,{samples : []}, {samples : [ { pts: pts, dts : pts, unit : id3.payload} ]}, { samples: [] }, timeOffset,
        undefined, undefined, undefined, undefined, this.fragStats);
     if (final) {
-      this.observer.trigger(Event.FRAG_PARSED, {startPTS: startPTS, endPTS: endPTS, PTSDTSshift: 0});
+      this.observer.trigger(Event.FRAG_PARSED, {startPTS: startPTS, endPTS: endPTS});
     }
   }
 

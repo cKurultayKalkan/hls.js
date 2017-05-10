@@ -2367,7 +2367,7 @@ var StreamController = function (_EventHandler) {
           media = this.media,
           seekFlag = media && media.seeking || holaSeek;
 
-      if (bufferEnd < end - (fragments[fragLen - 1].PTSDTSshift || 0) - 0.05) {
+      if (bufferEnd < end - 0.05) {
         if (bufferEnd > end - maxFragLookUpTolerance || seekFlag) {
           maxFragLookUpTolerance = 0;
         }
@@ -2393,11 +2393,11 @@ var StreamController = function (_EventHandler) {
           if (candidate.firstGop - maxFragLookUpTolerance < bufferEnd && candidate.firstGop + maxFragLookUpTolerance > bufferEnd) {
             return 0;
           }
-          if (candidate.start + candidate.duration - candidate.PTSDTSshift - maxFragLookUpTolerance <= bufferEnd) {
+          if (candidate.start + candidate.duration - maxFragLookUpTolerance <= bufferEnd) {
             return 1;
           }
           // if maxFragLookUpTolerance will have negative value then don't return -1 for first element
-          if (candidate.start - candidate.PTSDTSshift - maxFragLookUpTolerance > bufferEnd && candidate.start) {
+          if (candidate.start - maxFragLookUpTolerance > bufferEnd && candidate.start) {
             return candidate.sn > levelDetails.startSN ? -1 : 0;
           }
           return 0;
@@ -3053,9 +3053,9 @@ var StreamController = function (_EventHandler) {
             level = this.levels[frag.level];
         this.stats.tparsed = performance.now();
         this.state = State.PARSED;
-        _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + (data.startPTS ? data.startPTS.toFixed(3) : 'none') + ',' + (data.endPTS ? data.endPTS.toFixed(3) : 'none') + '],PTSDTSshift:' + (data.PTSDTSshift ? data.PTSDTSshift.toFixed(3) : 'none') + ',lastGopPTS:' + (data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'));
+        _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + (data.startPTS ? data.startPTS.toFixed(3) : 'none') + ',' + (data.endPTS ? data.endPTS.toFixed(3) : 'none') + '],lastGopPTS:' + (data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'));
         if (data.startPTS !== undefined && data.endPTS !== undefined) {
-          var drift = _levelHelper2.default.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
+          var drift = _levelHelper2.default.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.lastGopPTS);
           this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: level.details, level: frag.level, drift: drift });
         } else {
           // forse reload of prev fragment if video samples not found
@@ -4231,7 +4231,7 @@ var AACDemuxer = function () {
       }
       this.remuxer.remux(this._aacTrack, { samples: [] }, { samples: [{ pts: pts, dts: pts, unit: id3.payload }] }, { samples: [] }, timeOffset, undefined, undefined, undefined, undefined, this.fragStats);
       if (final) {
-        this.observer.trigger(_events2.default.FRAG_PARSED, { startPTS: startPTS, endPTS: endPTS, PTSDTSshift: 0 });
+        this.observer.trigger(_events2.default.FRAG_PARSED, { startPTS: startPTS, endPTS: endPTS });
       }
     }
   }, {
@@ -5729,48 +5729,46 @@ var TSDemuxer = function () {
           _saveTextSamples = [],
           maxk,
           samples = this._avcTrack.samples,
-          startPTS,
-          endPTS,
+          segStartDTS,
+          segEndDTS,
           gopEndDTS,
           initDTS;
       var timescale = this.remuxer.PES_TIMESCALE;
       if (samples.length && final) {
-        this.fragStats.PTSDTSshift = ((this.fragStartPts === undefined ? samples[0].pts : this.fragStartPts) - (this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts)) / timescale;
         initDTS = this.remuxer._initDTS === undefined ? samples[0].dts - timescale * this.timeOffset : this.remuxer._initDTS;
         var startDTS = Math.max(this.remuxer._PTSNormalize((this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS) - initDTS, this.nextAvcDts), 0);
         var sample = samples[samples.length - 1];
-        var videoStartPTS = Math.max(this.remuxer._PTSNormalize((this.fragStartPts === undefined ? samples[0].pts : this.fragStartPts) - initDTS, this.nextAvcDts), 0) / timescale;
-        var videoEndPTS = Math.max(this.remuxer._PTSNormalize(sample.pts - initDTS, this.nextAvcDts), 0) / timescale;
+        var videoStartDTS = Math.max(this.remuxer._PTSNormalize((this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts) - initDTS, this.nextAvcDts), 0) / timescale;
+        var videoEndDTS = Math.max(this.remuxer._PTSNormalize(sample.dts - initDTS, this.nextAvcDts), 0) / timescale;
         if (this.accurate && Math.abs(startDTS - this.nextAvcDts) > 90) {
-          videoStartPTS -= (startDTS - this.nextAvcDts) / timescale;
+          videoStartDTS -= (startDTS - this.nextAvcDts) / timescale;
         }
         if (samples.length + this.remuxAVCCount > this.fragStartAVCPos + 1 && this.fragStartDts !== undefined) {
           var fragStartDts = this.remuxer._PTSNormalize(this.fragStartDts, this.nextAvcDts);
           var sampleDts = this.remuxer._PTSNormalize(sample.dts, this.nextAvcDts);
-          videoEndPTS += (sampleDts - fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
+          videoEndDTS += (sampleDts - fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
         }
-        startPTS = videoStartPTS;
-        endPTS = videoEndPTS;
+        segStartDTS = videoStartDTS;
+        segEndDTS = videoEndDTS;
         if (this._aacTrack.audiosamplerate) {
           var expectedSampleDuration = 1024 / this._aacTrack.audiosamplerate;
           var remuxAACCount = this._aacTrack.samples.length;
-          var nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts / timescale : this.accurate ? this.timeOffset : startPTS;
-          startPTS = Math.max(startPTS, nextAacPTS + (this.fragStartAACPos - this.remuxAACCount) * expectedSampleDuration);
+          var nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts / timescale : this.accurate ? this.timeOffset : segStartDTS;
+          segStartDTS = Math.max(segStartDTS, nextAacPTS + (this.fragStartAACPos - this.remuxAACCount) * expectedSampleDuration);
           if (remuxAACCount) {
-            endPTS = Math.min(endPTS, nextAacPTS + expectedSampleDuration * remuxAACCount);
+            segEndDTS = Math.min(segEndDTS, nextAacPTS + expectedSampleDuration * remuxAACCount);
           }
           var AVUnsync = void 0;
-          if ((AVUnsync = endPTS - startPTS + videoStartPTS - videoEndPTS) > 0.2) {
+          if ((AVUnsync = segEndDTS - segStartDTS + videoStartDTS - videoEndDTS) > 0.2) {
             this.fragStats.AVUnsync = AVUnsync;
           }
         }
-        // console.log(`parsed total ${startPTS}/${endPTS} video ${videoStartPTS}/${videoEndPTS} shift ${this.fragStats.PTSDTSshift}`);
       }
       if (!flush) {
         // save samples and break by GOP
         for (maxk = samples.length - 1; maxk > 0; maxk--) {
           if (samples[maxk].key) {
-            if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < startPTS) {
+            if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < segStartDTS) {
               maxk = 0;
             }
             break;
@@ -5804,7 +5802,7 @@ var TSDemuxer = function () {
       //notify end of parsing
       if (final) {
         var lastGopPTS = Math.min(this.remuxer.nextAvcDts, this.remuxer.nextAacPts) / timescale;
-        this.observer.trigger(_events2.default.FRAG_PARSED, { startPTS: startPTS, endPTS: endPTS, PTSDTSshift: this.fragStats.PTSDTSshift, lastGopPTS: lastGopPTS });
+        this.observer.trigger(_events2.default.FRAG_PARSED, { startPTS: segStartDTS, endPTS: segEndDTS, lastGopPTS: lastGopPTS });
       }
     }
   }, {
@@ -7139,7 +7137,6 @@ var LevelHelper = function () {
           newFrag.start = newFrag.startPTS = oldFrag.startPTS;
           newFrag.endPTS = oldFrag.endPTS;
           newFrag.duration = oldFrag.duration;
-          newFrag.PTSDTSshift = oldFrag.PTSDTSshift;
           newFrag.lastGop = oldFrag.lastGop;
           PTSFrag = newFrag;
         }
@@ -7157,7 +7154,7 @@ var LevelHelper = function () {
 
       // if at least one fragment contains PTS info, recompute PTS information for all fragments
       if (PTSFrag) {
-        LevelHelper.updateFragPTS(newDetails, PTSFrag.sn, PTSFrag.startPTS, PTSFrag.endPTS, PTSFrag.PTSDTSshift || 0, PTSFrag.lastGop);
+        LevelHelper.updateFragPTS(newDetails, PTSFrag.sn, PTSFrag.startPTS, PTSFrag.endPTS, PTSFrag.lastGop);
       } else {
         // ensure that delta is within oldfragments range
         // also adjust sliding in case delta is 0 (we could have old=[50-60] and new=old=[50-61])
@@ -7177,7 +7174,7 @@ var LevelHelper = function () {
     }
   }, {
     key: 'updateFragPTS',
-    value: function updateFragPTS(details, sn, startPTS, endPTS, PTSDTSshift, lastGop) {
+    value: function updateFragPTS(details, sn, startPTS, endPTS, lastGop) {
       var fragIdx, fragments, frag, i;
       // exit if sn out of range
       if (sn < details.startSN || sn > details.endSN) {
@@ -7196,7 +7193,6 @@ var LevelHelper = function () {
       frag.start = frag.startPTS = startPTS;
       frag.endPTS = endPTS;
       frag.duration = endPTS - startPTS;
-      frag.PTSDTSshift = PTSDTSshift || 0;
       if (lastGop) {
         frag.lastGop = lastGop;
       }
@@ -7244,13 +7240,8 @@ var LevelHelper = function () {
           fragTo.start = fragFrom.start - fragTo.duration;
         }
       }
-      if (toIdx > fromIdx) {
-        if (!fragTo.PTSDTSshift) {
-          fragTo.PTSDTSshift = fragFrom.PTSDTSshift || 0;
-        }
-        if (fragFrom.lastGop) {
-          fragTo.firstGop = fragFrom.lastGop;
-        }
+      if (toIdx > fromIdx && fragFrom.lastGop) {
+        fragTo.firstGop = fragFrom.lastGop;
       }
     }
   }]);
@@ -7375,7 +7366,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-142';
+      return '0.6.1-143';
     }
   }, {
     key: 'Events',
@@ -7415,7 +7406,7 @@ var Hls = function () {
           liveSyncDuration: undefined,
           liveMaxLatencyDuration: undefined,
           maxMaxBufferLength: 40,
-          enableWorker: !Hls.isIe(),
+          enableWorker: 0 && !Hls.isIe(),
           enableSoftwareAES: true,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
@@ -8197,6 +8188,7 @@ var PlaylistLoader = function (_EventHandler) {
   }, {
     key: 'parseLevelPlaylist',
     value: function parseLevelPlaylist(string, baseurl, id) {
+      this.hls.config = this.hls.config || {};
       var currentSN = 0,
           fragdecryptdata,
           totalduration = 0,
@@ -8207,6 +8199,7 @@ var PlaylistLoader = function (_EventHandler) {
           frag = null,
           result,
           regexp,
+          minDuration = (this.hls.config.maxFragLookUpTolerance || 0.2) + 0.001,
           byteRangeEndOffset,
           byteRangeStartOffset,
           tagList = [];
@@ -8257,13 +8250,14 @@ var PlaylistLoader = function (_EventHandler) {
           case 'INF':
             var duration = parseFloat(result[1]);
             if (!isNaN(duration)) {
+              minDuration = Math.min(duration, minDuration);
               var sn = currentSN++;
               fragdecryptdata = this.fragmentDecryptdataFromLevelkey(levelkey, sn);
               var url = result[2] ? this.resolve(result[2], baseurl) : null;
               tagList.push(result.map(function (e) {
                 return (' ' + e).slice(1);
               }));
-              frag = { url: url, duration: duration, start: totalduration, sn: sn, level: id, cc: cc, byteRangeStartOffset: byteRangeStartOffset, byteRangeEndOffset: byteRangeEndOffset, decryptdata: fragdecryptdata, programDateTime: programDateTime, tagList: tagList, PTSDTSshift: 0 };
+              frag = { url: url, duration: duration, start: totalduration, sn: sn, level: id, cc: cc, byteRangeStartOffset: byteRangeStartOffset, byteRangeEndOffset: byteRangeEndOffset, decryptdata: fragdecryptdata, programDateTime: programDateTime, tagList: tagList };
               level.fragments.push(frag);
               totalduration += duration;
               byteRangeStartOffset = null;
@@ -8327,6 +8321,7 @@ var PlaylistLoader = function (_EventHandler) {
       level.totalduration = totalduration;
       level.averagetargetduration = totalduration / level.fragments.length;
       level.endSN = currentSN - 1;
+      this.hls.config.maxFragLookUpTolerance = Math.max(minDuration - 0.001, 0);
       return level;
     }
   }, {

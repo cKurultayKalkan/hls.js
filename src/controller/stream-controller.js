@@ -380,7 +380,7 @@ class StreamController extends EventHandler {
         media = this.media,
         seekFlag = media && media.seeking || holaSeek;
 
-    if (bufferEnd < end-(fragments[fragLen-1].PTSDTSshift||0)-0.05) {
+    if (bufferEnd < end-0.05) {
       if (bufferEnd > end - maxFragLookUpTolerance || seekFlag) {
         maxFragLookUpTolerance = 0;
       }
@@ -406,11 +406,11 @@ class StreamController extends EventHandler {
         if (candidate.firstGop - maxFragLookUpTolerance < bufferEnd && candidate.firstGop + maxFragLookUpTolerance > bufferEnd) {
           return 0;
         }
-        if (candidate.start + candidate.duration - candidate.PTSDTSshift - maxFragLookUpTolerance <= bufferEnd) {
+        if (candidate.start + candidate.duration - maxFragLookUpTolerance <= bufferEnd) {
           return 1;
         }
         // if maxFragLookUpTolerance will have negative value then don't return -1 for first element
-        if (candidate.start - candidate.PTSDTSshift - maxFragLookUpTolerance > bufferEnd && candidate.start) {
+        if (candidate.start - maxFragLookUpTolerance > bufferEnd && candidate.start) {
           return candidate.sn>levelDetails.startSN ? -1 : 0;
         }
         return 0;
@@ -1073,9 +1073,9 @@ class StreamController extends EventHandler {
       var frag = this.fragCurrent, level = this.levels[frag.level];
       this.stats.tparsed = performance.now();
       this.state = State.PARSED;
-      logger.log(`parsed frag sn:${frag.sn},PTS:[${data.startPTS ? data.startPTS.toFixed(3) : 'none'},${data.endPTS ? data.endPTS.toFixed(3) : 'none'}],PTSDTSshift:${data.PTSDTSshift ? data.PTSDTSshift.toFixed(3) : 'none'},lastGopPTS:${data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'}`);
+      logger.log(`parsed frag sn:${frag.sn},PTS:[${data.startPTS ? data.startPTS.toFixed(3) : 'none'},${data.endPTS ? data.endPTS.toFixed(3) : 'none'}],lastGopPTS:${data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'}`);
       if (data.startPTS !== undefined && data.endPTS !== undefined) {
-        var drift = LevelHelper.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.PTSDTSshift, data.lastGopPTS);
+        var drift = LevelHelper.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.lastGopPTS);
         this.hls.trigger(Event.LEVEL_PTS_UPDATED, {details: level.details, level: frag.level, drift: drift});
       } else {
         // forse reload of prev fragment if video samples not found
