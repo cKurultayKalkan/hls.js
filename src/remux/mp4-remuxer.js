@@ -38,7 +38,7 @@ class MP4Remuxer {
     this.nextAacPts = this.nextAvcDts = undefined;
   }
 
-  remux(audioTrack,videoTrack,id3Track,textTrack,timeOffset, contiguous, accurate, data, flush, stats, isPartial) {
+  remux(audioTrack,videoTrack,id3Track,textTrack,timeOffset, contiguous, accurate, data, flush,stats) {
     // dummy
     data = null;
 
@@ -52,7 +52,7 @@ class MP4Remuxer {
       // calculated in remuxAudio.
       //logger.log('nb AAC samples:' + audioTrack.samples.length);
       if (audioTrack.samples.length) {
-        let audioData = this.remuxAudio(audioTrack,timeOffset,contiguous,accurate, stats, isPartial);
+        let audioData = this.remuxAudio(audioTrack,timeOffset,contiguous,accurate, stats);
         //logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (videoTrack.samples.length) {
           let audioTrackLength, audioStartPTS;
@@ -60,7 +60,7 @@ class MP4Remuxer {
             audioStartPTS = audioData.startPTS;
             audioTrackLength = audioData.endPTS - audioStartPTS;
           }
-          this.remuxVideo(videoTrack,timeOffset,contiguous,audioTrackLength,audioStartPTS,flush,stats,isPartial);
+          this.remuxVideo(videoTrack,timeOffset,contiguous,audioTrackLength,audioStartPTS,flush,stats);
         } else if (!contiguous) {
           this.nextAvcDts = undefined;
         }
@@ -68,10 +68,10 @@ class MP4Remuxer {
         let videoData;
         //logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (videoTrack.samples.length) {
-          videoData = this.remuxVideo(videoTrack,timeOffset,contiguous,undefined,undefined,flush,stats,isPartial);
+          videoData = this.remuxVideo(videoTrack,timeOffset,contiguous,undefined,undefined,flush,stats);
         }
         if (videoData && audioTrack.codec) {
-          this.remuxEmptyAudio(audioTrack, timeOffset, contiguous, videoData, stats, isPartial);
+          this.remuxEmptyAudio(audioTrack, timeOffset, contiguous, videoData, stats);
         }
       }
     }
@@ -167,7 +167,7 @@ class MP4Remuxer {
     }
   }
 
-  remuxVideo(track, timeOffset, contiguous, audioTrackLength, audioStartPTS, flush,stats,isPartial) {
+  remuxVideo(track, timeOffset, contiguous, audioTrackLength, audioStartPTS, flush,stats) {
     var offset = 8,
         pesTimeScale = this.PES_TIMESCALE,
         pes2mp4ScaleFactor = this.PES2MP4SCALEFACTOR,
@@ -358,8 +358,7 @@ class MP4Remuxer {
       type: 'video',
       flush: flush,
       nb: outputSamples.length,
-      dropped: stats.dropped,
-      isPartial: isPartial
+      dropped: stats.dropped
     };
     // delta PTS between audio and video
     data.deltaPTS = Math.abs(data.startPTS-audioStartPTS);
@@ -367,7 +366,7 @@ class MP4Remuxer {
     return data;
   }
 
-  remuxAudio(track, timeOffset, contiguous, accurate, stats, isPartial) {
+  remuxAudio(track, timeOffset, contiguous, accurate, stats) {
     let pesTimeScale = this.PES_TIMESCALE,
         mp4timeScale = track.timescale,
         pes2mp4ScaleFactor = pesTimeScale/mp4timeScale,
@@ -597,8 +596,7 @@ class MP4Remuxer {
         startDTS: firstDTS / pesTimeScale,
         endDTS: (dtsnorm + pes2mp4ScaleFactor * lastSampleDuration) / pesTimeScale,
         type: 'audio',
-        nb: nbSamples,
-        isPartial: isPartial
+        nb: nbSamples
       };
       this.observer.trigger(Event.FRAG_PARSING_DATA, audioData);
       return audioData;
@@ -606,7 +604,7 @@ class MP4Remuxer {
     return null;
   }
 
-  remuxEmptyAudio(track, timeOffset, contiguous, videoData, stats, isPartial) {
+  remuxEmptyAudio(track, timeOffset, contiguous, videoData, stats) {
     let pesTimeScale = this.PES_TIMESCALE,
         mp4timeScale = track.timescale ? track.timescale : track.audiosamplerate,
         pes2mp4ScaleFactor = pesTimeScale/mp4timeScale,
@@ -638,7 +636,7 @@ class MP4Remuxer {
     }
     track.samples = samples;
 
-    this.remuxAudio(track, timeOffset, contiguous, undefined, stats, isPartial);
+    this.remuxAudio(track, timeOffset, contiguous, undefined, stats);
   }
 
   remuxID3(track,timeOffset) {

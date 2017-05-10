@@ -65,7 +65,7 @@
   switchLevel() {
     // flush end of previous segment
     if (this._avcTrack.samples.length) {
-      this.remux(null, false, true, false, true);
+      this.remux(null, false, true, false);
     }
     this.pmtParsed = false;
     this._pmtId = -1;
@@ -131,7 +131,7 @@
     } else {
       // flush any partial content
       if (this._avcTrack.samples.length) {
-        this.remux(null, false, true, false, true);
+        this.remux(null, false, true, false);
       }
       this.aacOverFlow = null;
       this._clearAllData();
@@ -300,7 +300,8 @@
       this.gopStartDTS = this._avcTrack.samples[0].dts;
     }
     this.remux(null, final, final && sn === lastSN, true);
-    if (final) {
+    if (final)
+    {
       this.observer.trigger(Event.FRAG_STATISTICS, this.fragStats);
     }
   }
@@ -336,7 +337,7 @@
     this._recalcTrack(track);
   }
 
-  remux(data, final, flush, lastSegment, isPartial) {
+  remux(data, final, flush, lastSegment) {
     var _saveAVCSamples = [], _saveAACSamples = [], _saveID3Samples = [],
         _saveTextSamples = [], maxk, samples = this._avcTrack.samples,
         startPTS, endPTS, gopEndDTS, initDTS;
@@ -398,7 +399,7 @@
       this.remuxAVCCount += this._avcTrack.samples.length;
       this.remuxAACCount += this._aacTrack.samples.length;
       this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset,
-        flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats, isPartial);
+        flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats);
       this.lastContiguous = undefined;
       this.nextStartPts = this.remuxer.endPTS;
       this._avcTrack.samples = _saveAVCSamples;

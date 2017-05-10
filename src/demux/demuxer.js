@@ -137,7 +137,6 @@ class Demuxer {
           nb: data.nb,
           dropped: data.dropped,
           deltaPTS: data.deltaPTS,
-          isPartial: data.isPartial,
         });
         break;
       case Event.FRAG_PARSING_METADATA:
