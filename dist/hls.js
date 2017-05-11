@@ -2408,23 +2408,24 @@ var StreamController = function (_EventHandler) {
       }
       if (foundFrag) {
         frag = foundFrag;
-        start = foundFrag.start;
+        var curSNIdx = frag.sn - levelDetails.startSN;
+        var prevFrag = fragments[curSNIdx - 1];
+        var nextFrag = fragments[curSNIdx + 1];
         _logger.logger.log('find SN matching with pos:' + bufferEnd + ':' + frag.sn);
-        if (fragPrevious && frag.sn === fragPrevious.sn) {
+        if (!frag.backtracked && fragPrevious && frag.sn === fragPrevious.sn) {
           if (frag.sn < levelDetails.endSN) {
-            var deltaPTS = fragPrevious.deltaPTS,
-                curSNIdx = frag.sn - levelDetails.startSN;
+            var deltaPTS = fragPrevious.deltaPTS;
             // if there is a significant delta between audio and video, larger than max allowed hole,
             // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
             // let's try to load previous fragment again to get last keyframe
             // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
             if (this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !_bufferHelper2.default.isBuffered(media, bufferEnd))) {
-              frag = fragments[curSNIdx - 1];
+              frag = prevFrag;
               _logger.logger.warn('SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this');
               // decrement previous frag load counter to avoid frag loop loading error when next fragment will get reloaded
               fragPrevious.loadCounter--;
             } else {
-              frag = fragments[curSNIdx + 1];
+              frag = nextFrag;
               _logger.logger.log('SN just loaded, load next one: ' + frag.sn);
             }
           } else {
@@ -2440,6 +2441,26 @@ var StreamController = function (_EventHandler) {
               }
             }
             frag = null;
+          }
+        } else if (frag.dropped && frag.backtracked) {
+          // Only backtrack a max of 1 consecutive fragment to prevent sliding back too far when little or no frags start with keyframes
+          if (nextFrag && nextFrag.backtracked) {
+            _logger.logger.log('Already backtracked from fragment ' + (curSNIdx + 1) + ', will not backtrack to fragment ' + curSNIdx + '. Loading fragment ' + (curSNIdx + 1));
+            frag = nextFrag;
+          } else {
+            // If a fragment has dropped frames and it's in a different level/sequence, load the previous fragment to try and find the keyframe
+            // Reset the dropped count now since it won't be reset until we parse the fragment again, which prevents infinite backtracking on the same segment
+            _logger.logger.log('Loaded fragment with dropped frames, backtracking 1 segment to find a keyframe');
+            frag.dropped = 0;
+            if (prevFrag) {
+              if (prevFrag.loadCounter) {
+                prevFrag.loadCounter--;
+              }
+              frag = prevFrag;
+              frag.forceQid = true;
+            } else {
+              frag = null;
+            }
           }
         }
       }
@@ -2681,7 +2702,7 @@ var StreamController = function (_EventHandler) {
         levels.forEach(function (level) {
           if (level.details) {
             level.details.fragments.forEach(function (fragment) {
-              fragment.loadCounter = undefined;
+              fragment.loadCounter = fragment.backtracked = fragment.forceQid = undefined;
             });
           }
         });
@@ -3050,17 +3071,40 @@ var StreamController = function (_EventHandler) {
     value: function onFragParsed(data) {
       if (this.state === State.PARSING) {
         var frag = this.fragCurrent,
-            level = this.levels[frag.level];
+            fragPrevious = this.fragPrevious,
+            details = this.levels[frag.level].details;
         this.stats.tparsed = performance.now();
         this.state = State.PARSED;
         _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + (data.startPTS ? data.startPTS.toFixed(3) : 'none') + ',' + (data.endPTS ? data.endPTS.toFixed(3) : 'none') + '],lastGopPTS:' + (data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'));
         if (data.startPTS !== undefined && data.endPTS !== undefined) {
-          var drift = _levelHelper2.default.updateFragPTS(level.details, frag.sn, data.startPTS, data.endPTS, data.lastGopPTS);
-          this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: level.details, level: frag.level, drift: drift });
+          var drift = _levelHelper2.default.updateFragPTS(details, frag.sn, data.startPTS, data.endPTS, data.lastGopPTS);
+          this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: details, level: frag.level, drift: drift });
         } else {
           // forse reload of prev fragment if video samples not found
           frag.dropped = 1;
           frag.deltaPTS = this.config.maxSeekHole + 1;
+        }
+        var sameLevel = fragPrevious && frag.level === fragPrevious.level;
+        if (this.hls.config.backtrackOnDrop && !details.live && !data.isPartial && !sameLevel) {
+          var curSNIdx = frag.sn - details.startSN;
+          var detFrag = details.fragments[curSNIdx];
+          if (curSNIdx) {
+            if (frag.dropped) {
+              detFrag.dropped = frag.dropped;
+              if (!detFrag.backtracked) {
+                // Causes findFragments to backtrack a segment and find the keyframe
+                // Audio fragments arriving before video sets the nextLoadPosition, causing _findFragments to skip the backtracked fragment
+                frag.backtracked = detFrag.backtracked = true;
+                this.nextLoadPosition = data.startPTS;
+              } else {
+                _logger.logger.log('Already backtracked on this fragment, appending with the gap');
+              }
+            } else {
+              // Only reset the backtracked flag if we've loaded the frag without any dropped frames
+              frag.backtracked = detFrag.backtracked = false;
+              frag.forceQid = detFrag.forceQid = false;
+            }
+          }
         }
         this.hls.trigger(_events2.default.FRAG_APPENDING);
       }
@@ -4586,7 +4630,7 @@ var DemuxerWorker = function DemuxerWorker(self) {
   });
 
   observer.on(_events2.default.FRAG_PARSING_DATA, function (ev, data) {
-    var objData = { event: ev, type: data.type, startPTS: data.startPTS, endPTS: data.endPTS, startDTS: data.startDTS, endDTS: data.endDTS, data1: data.data1.buffer, data2: data.data2.buffer, nb: data.nb, dropped: data.dropped, deltaPTS: data.deltaPTS };
+    var objData = { event: ev, type: data.type, startPTS: data.startPTS, endPTS: data.endPTS, startDTS: data.startDTS, endDTS: data.endDTS, data1: data.data1.buffer, data2: data.data2.buffer, nb: data.nb, dropped: data.dropped, deltaPTS: data.deltaPTS, isPartial: data.isPartial };
     // pass data1/data2 as transferable object (no copy)
     self.postMessage(objData, [objData.data1, objData.data2]);
   });
@@ -4789,7 +4833,8 @@ var Demuxer = function () {
             type: data.type,
             nb: data.nb,
             dropped: data.dropped,
-            deltaPTS: data.deltaPTS
+            deltaPTS: data.deltaPTS,
+            isPartial: data.isPartial
           });
           break;
         case _events2.default.FRAG_PARSING_METADATA:
@@ -5787,7 +5832,7 @@ var TSDemuxer = function () {
       if ((flush || final && !this.remuxAVCCount) && this._avcTrack.samples.length + this._aacTrack.samples.length || maxk > 0) {
         this.remuxAVCCount += this._avcTrack.samples.length;
         this.remuxAACCount += this._aacTrack.samples.length;
-        this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset, flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats);
+        this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset, flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats, flush && !lastSegment);
         this.lastContiguous = undefined;
         this.nextStartPts = this.remuxer.endPTS;
         this._avcTrack.samples = _saveAVCSamples;
@@ -7366,7 +7411,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-144';
+      return '0.6.1-145';
     }
   }, {
     key: 'Events',
@@ -9003,7 +9048,7 @@ var MP4Remuxer = function () {
     }
   }, {
     key: 'remux',
-    value: function remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurate, data, flush, stats) {
+    value: function remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurate, data, flush, stats, isPartial) {
       // dummy
       data = null;
 
@@ -9017,7 +9062,7 @@ var MP4Remuxer = function () {
         // calculated in remuxAudio.
         //logger.log('nb AAC samples:' + audioTrack.samples.length);
         if (audioTrack.samples.length) {
-          var audioData = this.remuxAudio(audioTrack, timeOffset, contiguous, accurate, stats);
+          var audioData = this.remuxAudio(audioTrack, timeOffset, contiguous, accurate, stats, isPartial);
           //logger.log('nb AVC samples:' + videoTrack.samples.length);
           if (videoTrack.samples.length) {
             var audioTrackLength = void 0,
@@ -9026,7 +9071,7 @@ var MP4Remuxer = function () {
               audioStartPTS = audioData.startPTS;
               audioTrackLength = audioData.endPTS - audioStartPTS;
             }
-            this.remuxVideo(videoTrack, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush, stats);
+            this.remuxVideo(videoTrack, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush, stats, isPartial);
           } else if (!contiguous) {
             this.nextAvcDts = undefined;
           }
@@ -9034,10 +9079,10 @@ var MP4Remuxer = function () {
           var videoData = void 0;
           //logger.log('nb AVC samples:' + videoTrack.samples.length);
           if (videoTrack.samples.length) {
-            videoData = this.remuxVideo(videoTrack, timeOffset, contiguous, accurate, undefined, undefined, flush, stats);
+            videoData = this.remuxVideo(videoTrack, timeOffset, contiguous, accurate, undefined, undefined, flush, stats, isPartial);
           }
           if (videoData && audioTrack.codec) {
-            this.remuxEmptyAudio(audioTrack, timeOffset, contiguous, videoData, stats);
+            this.remuxEmptyAudio(audioTrack, timeOffset, contiguous, videoData, stats, isPartial);
           }
         }
       }
@@ -9137,7 +9182,7 @@ var MP4Remuxer = function () {
     }
   }, {
     key: 'remuxVideo',
-    value: function remuxVideo(track, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush, stats) {
+    value: function remuxVideo(track, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush, stats, isPartial) {
       var offset = 8,
           pesTimeScale = this.PES_TIMESCALE,
           pes2mp4ScaleFactor = this.PES2MP4SCALEFACTOR,
@@ -9332,7 +9377,8 @@ var MP4Remuxer = function () {
         type: 'video',
         flush: flush,
         nb: outputSamples.length,
-        dropped: stats.dropped
+        dropped: stats.dropped,
+        isPartial: isPartial
       };
       // delta PTS between audio and video
       data.deltaPTS = Math.abs(data.startPTS - audioStartPTS);
@@ -9341,7 +9387,7 @@ var MP4Remuxer = function () {
     }
   }, {
     key: 'remuxAudio',
-    value: function remuxAudio(track, timeOffset, contiguous, accurate, stats) {
+    value: function remuxAudio(track, timeOffset, contiguous, accurate, stats, isPartial) {
       var pesTimeScale = this.PES_TIMESCALE,
           mp4timeScale = track.timescale,
           pes2mp4ScaleFactor = pesTimeScale / mp4timeScale,
@@ -9579,7 +9625,8 @@ var MP4Remuxer = function () {
           startDTS: firstDTS / pesTimeScale,
           endDTS: (dtsnorm + pes2mp4ScaleFactor * lastSampleDuration) / pesTimeScale,
           type: 'audio',
-          nb: nbSamples
+          nb: nbSamples,
+          isPartial: isPartial
         };
         this.observer.trigger(_events2.default.FRAG_PARSING_DATA, audioData);
         return audioData;
@@ -9588,7 +9635,7 @@ var MP4Remuxer = function () {
     }
   }, {
     key: 'remuxEmptyAudio',
-    value: function remuxEmptyAudio(track, timeOffset, contiguous, videoData, stats) {
+    value: function remuxEmptyAudio(track, timeOffset, contiguous, videoData, stats, isPartial) {
       var pesTimeScale = this.PES_TIMESCALE,
           mp4timeScale = track.timescale ? track.timescale : track.audiosamplerate,
           pes2mp4ScaleFactor = pesTimeScale / mp4timeScale,
@@ -9623,7 +9670,7 @@ var MP4Remuxer = function () {
       }
       track.samples = samples;
 
-      this.remuxAudio(track, timeOffset, contiguous, undefined, stats);
+      this.remuxAudio(track, timeOffset, contiguous, undefined, stats, isPartial);
     }
   }, {
     key: 'remuxID3',

@@ -300,8 +300,7 @@
       this.gopStartDTS = this._avcTrack.samples[0].dts;
     }
     this.remux(null, final, final && sn === lastSN, true);
-    if (final)
-    {
+    if (final) {
       this.observer.trigger(Event.FRAG_STATISTICS, this.fragStats);
     }
   }
@@ -397,7 +396,7 @@
       this.remuxAVCCount += this._avcTrack.samples.length;
       this.remuxAACCount += this._aacTrack.samples.length;
       this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset,
-        flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats);
+        flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats, flush && !lastSegment);
       this.lastContiguous = undefined;
       this.nextStartPts = this.remuxer.endPTS;
       this._avcTrack.samples = _saveAVCSamples;
