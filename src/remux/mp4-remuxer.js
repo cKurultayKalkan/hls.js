@@ -60,7 +60,7 @@ class MP4Remuxer {
             audioStartPTS = audioData.startPTS;
             audioTrackLength = audioData.endPTS - audioStartPTS;
           }
-          this.remuxVideo(videoTrack,timeOffset,contiguous,audioTrackLength,audioStartPTS,flush,stats);
+          this.remuxVideo(videoTrack,timeOffset,contiguous,accurate,audioTrackLength,audioStartPTS,flush,stats);
         } else if (!contiguous) {
           this.nextAvcDts = undefined;
         }
@@ -68,7 +68,7 @@ class MP4Remuxer {
         let videoData;
         //logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (videoTrack.samples.length) {
-          videoData = this.remuxVideo(videoTrack,timeOffset,contiguous,undefined,undefined,flush,stats);
+          videoData = this.remuxVideo(videoTrack,timeOffset,contiguous,accurate,undefined,undefined,flush,stats);
         }
         if (videoData && audioTrack.codec) {
           this.remuxEmptyAudio(audioTrack, timeOffset, contiguous, videoData, stats);
@@ -167,7 +167,7 @@ class MP4Remuxer {
     }
   }
 
-  remuxVideo(track, timeOffset, contiguous, audioTrackLength, audioStartPTS, flush,stats) {
+  remuxVideo(track, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush,stats) {
     var offset = 8,
         pesTimeScale = this.PES_TIMESCALE,
         pes2mp4ScaleFactor = this.PES2MP4SCALEFACTOR,
@@ -188,7 +188,7 @@ class MP4Remuxer {
       }
     }
 
-    contiguous |= (inputSamples.length && this.nextAvcDts && Math.abs(timeOffset-this.nextAvcDts/pesTimeScale) < 0.1);
+    contiguous |= (inputSamples.length && this.nextAvcDts && accurate && Math.abs(timeOffset-this.nextAvcDts/pesTimeScale) < 0.1);
 
     // PTS is coded on 33bits, and can loop from -2^32 to 2^32
     // PTSNormalize will make PTS/DTS value monotonic, we use last known DTS value as reference value
@@ -391,7 +391,7 @@ class MP4Remuxer {
     // this helps ensuring audio continuity
     // and this also avoids audio glitches/cut when switching quality, or reporting wrong duration on first audio frame
 
-    contiguous |= (samples0.length && this.nextAacPts && Math.abs(timeOffset-this.nextAacPts/pesTimeScale) < 0.1);
+    contiguous |= (samples0.length && this.nextAacPts && accurate && Math.abs(timeOffset-this.nextAacPts/pesTimeScale) < 0.1);
     let nextAacPts = (contiguous && this.nextAacPts !== undefined ? this.nextAacPts : timeOffset*pesTimeScale);
 
     // If the audio track is missing samples, the frames seem to get "left-shifted" within the
