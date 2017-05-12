@@ -43,6 +43,16 @@ class PlaylistLoader extends EventHandler {
     }
   }
 
+  replaceManifest(data, url) {
+      var levels = this.parseMasterPlaylist(data, url);
+      this.hls.trigger(Event.MANIFEST_REPLACE, {levels: levels, url: url});
+  }
+
+  replaceLevelPlaylist(id, data, url) {
+      var levelDetails = this.parseLevelPlaylist(data, url, id);
+      this.hls.trigger(Event.LEVEL_REPLACE, {details: levelDetails, level: id});
+  }
+
   load(url, id1, id2, preload) {
     var config = this.hls.config,
         retry,

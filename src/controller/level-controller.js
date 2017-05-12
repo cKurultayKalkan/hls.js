@@ -13,6 +13,7 @@ class LevelController extends EventHandler {
   constructor(hls) {
     super(hls,
       Event.MANIFEST_LOADED,
+      Event.MANIFEST_REPLACE,
       Event.LEVEL_LOADED,
       Event.ERROR);
     this.ontick = this.tick.bind(this);
@@ -56,14 +57,12 @@ class LevelController extends EventHandler {
     return level.videoCodec || !level.audioCodec && (level.bitrate>64000 || level.width || level.height);
   }
 
-  onManifestLoaded(data) {
+  parseManifest(data) {
     var levels0 = [],
         levels = [],
-        bitrateStart,
         bitrateSet = {},
         videoCodecFound = false,
         audioCodecFound = false,
-        hls = this.hls, i,
         brokenmp4inmp3 = /chrome|firefox/.test(navigator.userAgent.toLowerCase()),
         checkSupported = function(type,codec) { return MediaSource.isTypeSupported(`${type}/mp4;codecs=${codec}`);};
 
@@ -107,27 +106,48 @@ class LevelController extends EventHandler {
              (!videoCodec || checkSupported('video',videoCodec));
     });
 
+    return levels;
+  }
+
+  onManifestLoaded(data) {
+    let levels = this.parseManifest(data);
+
     if(levels.length) {
       // start bitrate is the first bitrate of the manifest
-      bitrateStart = levels[0].bitrate;
+      let bitrateStart = levels[0].bitrate;
       // sort level on bitrate
       levels.sort(function (a, b) {
         return a.bitrate - b.bitrate;
       });
       this._levels = levels;
       // find index of first level in sorted levels
-      for (i = 0; i < levels.length; i++) {
+      for (let i = 0; i < levels.length; i++) {
         if (levels[i].bitrate === bitrateStart) {
           this._firstLevel = i;
           logger.log(`manifest loaded,${levels.length} level(s) found, first bitrate:${bitrateStart}`);
           break;
         }
       }
-      hls.trigger(Event.MANIFEST_PARSED, {levels: this._levels, firstLevel: this._firstLevel, stats: data.stats});
+      this.hls.trigger(Event.MANIFEST_PARSED, {levels: this._levels, firstLevel: this._firstLevel, stats: data.stats});
     } else {
-      hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR, fatal: true, url: hls.url, reason: 'no level with compatible codecs found in manifest'});
+      this.hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR, fatal: true, url: this.hls.url, reason: 'no level with compatible codecs found in manifest'});
     }
     return;
+  }
+
+  onManifestReplace(data) {
+    let levels = this.parseManifest(data),
+        _this = this;
+    if (levels.length) {
+      logger.log('replace manifest with a new version');
+      // sort level on bitrate
+      levels.sort(function (a, b) {
+        return a.bitrate - b.bitrate;
+      });
+      levels.forEach((newLevel, i) => {
+        _this.levels[i].url = newLevel.url;
+      });
+    }
   }
 
   get levels() {

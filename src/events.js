@@ -27,12 +27,16 @@ module.exports = {
   MANIFEST_LOADING: 'hlsManifestLoading',
   // fired after manifest has been loaded - data: { levels : [available quality levels] , url : manifestURL, stats : { trequest, tfirst, tload, mtime}}
   MANIFEST_LOADED: 'hlsManifestLoaded',
+  // fired when master playlist have been replaced without affecting the playback - data: { levels : [available quality levels] , url : manifestURL }
+  MANIFEST_REPLACE: 'hlsManifestReplace',
   // fired after manifest has been parsed - data: { levels : [available quality levels] , firstLevel : index of first quality level appearing in Manifest}
   MANIFEST_PARSED: 'hlsManifestParsed',
   // fired when a level playlist loading starts - data: { url : level URL  level : id of level being loaded}
   LEVEL_LOADING: 'hlsLevelLoading',
   // fired when a level playlist loading finishes - data: { details : levelDetails object, level : id of loaded level, stats : { trequest, tfirst, tload, mtime} }
   LEVEL_LOADED: 'hlsLevelLoaded',
+  // fired when a level's details have been replaced without affecting the playback. - data: { details : levelDetails object, level : id of updated level }
+  LEVEL_REPLACE: 'hlsLevelReplace',
   // fired when a level's details have been updated based on previous details, after it has been loaded. - data: { details : levelDetails object, level : id of updated level }
   LEVEL_UPDATED: 'hlsLevelUpdated',
   // fired when a level's PTS information has been updated after parsing a fragment - data: { details : levelDetails object, level : id of updated level, drift: PTS drift observed when parsing last fragment }

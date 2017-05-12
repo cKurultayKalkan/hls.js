@@ -1576,11 +1576,11 @@ var LevelController = function (_EventHandler) {
   function LevelController(hls) {
     _classCallCheck(this, LevelController);
 
-    var _this = _possibleConstructorReturn(this, (LevelController.__proto__ || Object.getPrototypeOf(LevelController)).call(this, hls, _events2.default.MANIFEST_LOADED, _events2.default.LEVEL_LOADED, _events2.default.ERROR));
+    var _this2 = _possibleConstructorReturn(this, (LevelController.__proto__ || Object.getPrototypeOf(LevelController)).call(this, hls, _events2.default.MANIFEST_LOADED, _events2.default.MANIFEST_REPLACE, _events2.default.LEVEL_LOADED, _events2.default.ERROR));
 
-    _this.ontick = _this.tick.bind(_this);
-    _this._manualLevel = _this._autoLevelCapping = -1;
-    return _this;
+    _this2.ontick = _this2.tick.bind(_this2);
+    _this2._manualLevel = _this2._autoLevelCapping = -1;
+    return _this2;
   }
 
   _createClass(LevelController, [{
@@ -1626,18 +1626,15 @@ var LevelController = function (_EventHandler) {
       return level.videoCodec || !level.audioCodec && (level.bitrate > 64000 || level.width || level.height);
     }
   }, {
-    key: 'onManifestLoaded',
-    value: function onManifestLoaded(data) {
-      var _this2 = this;
+    key: 'parseManifest',
+    value: function parseManifest(data) {
+      var _this3 = this;
 
       var levels0 = [],
           levels = [],
-          bitrateStart,
           bitrateSet = {},
           videoCodecFound = false,
           audioCodecFound = false,
-          hls = this.hls,
-          i,
           brokenmp4inmp3 = /chrome|firefox/.test(navigator.userAgent.toLowerCase()),
           checkSupported = function checkSupported(type, codec) {
         return MediaSource.isTypeSupported(type + '/mp4;codecs=' + codec);
@@ -1645,7 +1642,7 @@ var LevelController = function (_EventHandler) {
 
       // regroup redundant level together
       data.levels.forEach(function (level) {
-        if (_this2.isVideoLevel(level)) {
+        if (_this3.isVideoLevel(level)) {
           videoCodecFound = true;
         }
         // erase audio codec info if browser does not support mp4a.40.34. demuxer will autodetect codec and fallback to mpeg/audio
@@ -1669,7 +1666,7 @@ var LevelController = function (_EventHandler) {
       // remove audio-only level if we also have levels with audio+video codecs signalled
       if (videoCodecFound && audioCodecFound) {
         levels0.forEach(function (level) {
-          if (_this2.isVideoLevel(level)) {
+          if (_this3.isVideoLevel(level)) {
             levels.push(level);
           }
         });
@@ -1683,27 +1680,50 @@ var LevelController = function (_EventHandler) {
         return (!audioCodec || checkSupported('audio', audioCodec)) && (!videoCodec || checkSupported('video', videoCodec));
       });
 
+      return levels;
+    }
+  }, {
+    key: 'onManifestLoaded',
+    value: function onManifestLoaded(data) {
+      var levels = this.parseManifest(data);
+
       if (levels.length) {
         // start bitrate is the first bitrate of the manifest
-        bitrateStart = levels[0].bitrate;
+        var bitrateStart = levels[0].bitrate;
         // sort level on bitrate
         levels.sort(function (a, b) {
           return a.bitrate - b.bitrate;
         });
         this._levels = levels;
         // find index of first level in sorted levels
-        for (i = 0; i < levels.length; i++) {
+        for (var i = 0; i < levels.length; i++) {
           if (levels[i].bitrate === bitrateStart) {
             this._firstLevel = i;
             _logger.logger.log('manifest loaded,' + levels.length + ' level(s) found, first bitrate:' + bitrateStart);
             break;
           }
         }
-        hls.trigger(_events2.default.MANIFEST_PARSED, { levels: this._levels, firstLevel: this._firstLevel, stats: data.stats });
+        this.hls.trigger(_events2.default.MANIFEST_PARSED, { levels: this._levels, firstLevel: this._firstLevel, stats: data.stats });
       } else {
-        hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR, fatal: true, url: hls.url, reason: 'no level with compatible codecs found in manifest' });
+        this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.MANIFEST_INCOMPATIBLE_CODECS_ERROR, fatal: true, url: this.hls.url, reason: 'no level with compatible codecs found in manifest' });
       }
       return;
+    }
+  }, {
+    key: 'onManifestReplace',
+    value: function onManifestReplace(data) {
+      var levels = this.parseManifest(data),
+          _this = this;
+      if (levels.length) {
+        _logger.logger.log('replace manifest with a new version');
+        // sort level on bitrate
+        levels.sort(function (a, b) {
+          return a.bitrate - b.bitrate;
+        });
+        levels.forEach(function (newLevel, i) {
+          _this.levels[i].url = newLevel.url;
+        });
+      }
     }
   }, {
     key: 'setLevelInternal',
@@ -1997,7 +2017,7 @@ var StreamController = function (_EventHandler) {
   function StreamController(hls) {
     _classCallCheck(this, StreamController);
 
-    var _this = _possibleConstructorReturn(this, (StreamController.__proto__ || Object.getPrototypeOf(StreamController)).call(this, hls, _events2.default.MEDIA_ATTACHED, _events2.default.MEDIA_DETACHING, _events2.default.MANIFEST_LOADING, _events2.default.MANIFEST_PARSED, _events2.default.LEVEL_LOADED, _events2.default.LEVEL_PTS_UPDATED, _events2.default.KEY_LOADED, _events2.default.FRAG_CHUNK_LOADED, _events2.default.FRAG_LOADED, _events2.default.FRAG_LOAD_EMERGENCY_ABORTED, _events2.default.FRAG_PARSING_INIT_SEGMENT, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_PARSED, _events2.default.FRAG_APPENDED, _events2.default.ERROR, _events2.default.BUFFER_FLUSHED, _events2.default.DEMUXER_QUEUE_EMPTY));
+    var _this = _possibleConstructorReturn(this, (StreamController.__proto__ || Object.getPrototypeOf(StreamController)).call(this, hls, _events2.default.MEDIA_ATTACHED, _events2.default.MEDIA_DETACHING, _events2.default.MANIFEST_LOADING, _events2.default.MANIFEST_PARSED, _events2.default.LEVEL_LOADED, _events2.default.LEVEL_REPLACE, _events2.default.LEVEL_PTS_UPDATED, _events2.default.KEY_LOADED, _events2.default.FRAG_CHUNK_LOADED, _events2.default.FRAG_LOADED, _events2.default.FRAG_LOAD_EMERGENCY_ABORTED, _events2.default.FRAG_PARSING_INIT_SEGMENT, _events2.default.FRAG_PARSING_DATA, _events2.default.FRAG_PARSED, _events2.default.FRAG_APPENDED, _events2.default.ERROR, _events2.default.BUFFER_FLUSHED, _events2.default.DEMUXER_QUEUE_EMPTY));
 
     _this.config = hls.config;
     _this.audioCodecSwap = false;
@@ -2892,6 +2912,14 @@ var StreamController = function (_EventHandler) {
       }
       //trigger handler right now
       this.tick();
+    }
+  }, {
+    key: 'onLevelReplace',
+    value: function onLevelReplace(data) {
+      _logger.logger.log('replace level ' + data.level + ' playlist with a new version');
+      var level = this.levels[data.level];
+      level.details = data.details;
+      this.hls.trigger(_events2.default.LEVEL_UPDATED, { details: data.details, level: data.level });
     }
   }, {
     key: 'onKeyLoaded',
@@ -6852,12 +6880,16 @@ module.exports = {
   MANIFEST_LOADING: 'hlsManifestLoading',
   // fired after manifest has been loaded - data: { levels : [available quality levels] , url : manifestURL, stats : { trequest, tfirst, tload, mtime}}
   MANIFEST_LOADED: 'hlsManifestLoaded',
+  // fired when master playlist have been replaced without affecting the playback - data: { levels : [available quality levels] , url : manifestURL }
+  MANIFEST_REPLACE: 'hlsManifestReplace',
   // fired after manifest has been parsed - data: { levels : [available quality levels] , firstLevel : index of first quality level appearing in Manifest}
   MANIFEST_PARSED: 'hlsManifestParsed',
   // fired when a level playlist loading starts - data: { url : level URL  level : id of level being loaded}
   LEVEL_LOADING: 'hlsLevelLoading',
   // fired when a level playlist loading finishes - data: { details : levelDetails object, level : id of loaded level, stats : { trequest, tfirst, tload, mtime} }
   LEVEL_LOADED: 'hlsLevelLoaded',
+  // fired when a level's details have been replaced without affecting the playback. - data: { details : levelDetails object, level : id of updated level }
+  LEVEL_REPLACE: 'hlsLevelReplace',
   // fired when a level's details have been updated based on previous details, after it has been loaded. - data: { details : levelDetails object, level : id of updated level }
   LEVEL_UPDATED: 'hlsLevelUpdated',
   // fired when a level's PTS information has been updated after parsing a fragment - data: { details : levelDetails object, level : id of updated level, drift: PTS drift observed when parsing last fragment }
@@ -7411,7 +7443,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-145';
+      return '0.6.1-146';
     }
   }, {
     key: 'Events',
@@ -8087,6 +8119,18 @@ var PlaylistLoader = function (_EventHandler) {
         this.loading = false;
         this.load(this.url, this.id, this.id2);
       }
+    }
+  }, {
+    key: 'replaceManifest',
+    value: function replaceManifest(data, url) {
+      var levels = this.parseMasterPlaylist(data, url);
+      this.hls.trigger(_events2.default.MANIFEST_REPLACE, { levels: levels, url: url });
+    }
+  }, {
+    key: 'replaceLevelPlaylist',
+    value: function replaceLevelPlaylist(id, data, url) {
+      var levelDetails = this.parseLevelPlaylist(data, url, id);
+      this.hls.trigger(_events2.default.LEVEL_REPLACE, { details: levelDetails, level: id });
     }
   }, {
     key: 'load',

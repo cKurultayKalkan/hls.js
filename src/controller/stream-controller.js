@@ -36,6 +36,7 @@ class StreamController extends EventHandler {
       Event.MANIFEST_LOADING,
       Event.MANIFEST_PARSED,
       Event.LEVEL_LOADED,
+      Event.LEVEL_REPLACE,
       Event.LEVEL_PTS_UPDATED,
       Event.KEY_LOADED,
       Event.FRAG_CHUNK_LOADED,
@@ -919,6 +920,13 @@ class StreamController extends EventHandler {
     }
     //trigger handler right now
     this.tick();
+  }
+
+  onLevelReplace(data) {
+    logger.log(`replace level ${data.level} playlist with a new version`);
+    var level = this.levels[data.level];
+    level.details = data.details;
+    this.hls.trigger(Event.LEVEL_UPDATED, { details: data.details, level: data.level });
   }
 
   onKeyLoaded() {
