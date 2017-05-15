@@ -5566,19 +5566,20 @@ var TSDemuxer = function () {
         this._clearAllData();
         this._setEmptyTracks();
       }
+      this.currentSN = sn;
+      var avcId = this._avcTrack.id,
+          aacId = this._aacTrack.id,
+          id3Id = this._id3Track.id;
+
       if (first) {
         this.lastContiguous = !trackSwitch && sn === this.lastSN + 1;
-        this.fragStats = { framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: { pmt: {}, idr: [], indr: [], sei: [] } };
+        this.fragStats = { framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: { pmt: { aac: aacId, avc: avcId, id3: id3Id }, idr: [], indr: [], sei: [] } };
         this.remuxAVCCount = this.remuxAACCount = 0;
         this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
         this.fragStartAVCPos = this._avcTrack.samples.length;
         this.fragStartAACPos = this._aacTrack.samples.length;
         this.nextAvcDts = this.contiguous ? this.remuxer.nextAvcDts : this.timeOffset * this.remuxer.PES_TIMESCALE;
       }
-      this.currentSN = sn;
-      var avcId = this._avcTrack.id,
-          aacId = this._aacTrack.id,
-          id3Id = this._id3Track.id;
 
       // don't parse last TS packet if incomplete
       len -= len % 188;
@@ -5731,6 +5732,8 @@ var TSDemuxer = function () {
       }
       this.remux(null, final, final && sn === lastSN, true);
       if (final) {
+        this.fragStats.keymap.sps = this._avcTrack.sps || undefined;
+        this.fragStats.keymap.pps = this._avcTrack.pps || undefined;
         this.observer.trigger(_events2.default.FRAG_STATISTICS, this.fragStats);
       }
     }
@@ -6099,6 +6102,17 @@ var TSDemuxer = function () {
       };
       pushAccessUnit = pushAccessUnit.bind(this);
 
+      var _addKey = function _addKey(type) {
+        var map = _this.fragStats.keymap;
+        var lastPos = -1;
+        lastPos = Math.max(map.idr[map.idr.length - 1] || -1, lastPos);
+        lastPos = Math.max(map.indr[map.indr.length - 1] || -1, lastPos);
+        lastPos = Math.max(map.sei[map.sei.length - 1] || -1, lastPos);
+        if (lastPos !== _this.lastAVCFrameStart) {
+          map[type].push(_this.lastAVCFrameStart);
+        }
+      };
+
       units.forEach(function (unit) {
         switch (unit.type) {
           //NDR
@@ -6118,7 +6132,7 @@ var TSDemuxer = function () {
               //if (sliceType === 2 || sliceType === 7) {
               if (sliceType === 2 || sliceType === 4 || sliceType === 7 || sliceType === 9) {
                 key = true;
-                _this.fragStats.keymap.indr.push(_this.lastAVCFrameStart);
+                _addKey('indr');
               }
             }
             break;
@@ -6129,7 +6143,7 @@ var TSDemuxer = function () {
               debugString += 'IDR ';
             }
             key = true;
-            _this.fragStats.keymap.idr.push(_this.lastAVCFrameStart);
+            _addKey('idr');
             break;
           //SEI
           case 6:
@@ -6163,7 +6177,7 @@ var TSDemuxer = function () {
               // if SEI recovery_point has been found mark as keyframe
               if (!hlsConfig.disableSEIkeyframes && payloadType === 6) {
                 key = true;
-                _this.fragStats.keymap.sei.push(_this.lastAVCFrameStart);
+                _addKey('sei');
               }
 
               // TODO: there can be more than one payload in an SEI packet...
@@ -6221,7 +6235,7 @@ var TSDemuxer = function () {
               var config = expGolombDecoder.readSPS();
               track.width = config.width;
               track.height = config.height;
-              _this.fragStats.keymap.sps = track.sps = [unit.data];
+              track.sps = [unit.data];
               track.duration = _this._duration;
               var codecarray = unit.data.subarray(1, 4);
               var codecstring = 'avc1.';
@@ -6242,7 +6256,7 @@ var TSDemuxer = function () {
               debugString += 'PPS ';
             }
             if (!track.pps) {
-              _this.fragStats.keymap.pps = track.pps = [unit.data];
+              track.pps = [unit.data];
             }
             break;
           case 9:
@@ -7411,7 +7425,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-145';
+      return '0.6.1-146';
     }
   }, {
     key: 'Events',

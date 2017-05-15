@@ -137,19 +137,20 @@
       this._clearAllData();
       this._setEmptyTracks();
     }
+    this.currentSN = sn;
+    var avcId = this._avcTrack.id,
+        aacId = this._aacTrack.id,
+        id3Id = this._id3Track.id;
+
     if (first) {
       this.lastContiguous = !trackSwitch && sn === this.lastSN+1;
-      this.fragStats = {framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: {pmt: {}, idr: [], indr: [], sei: []}};
+      this.fragStats = {framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: {pmt: {aac: aacId, avc: avcId, id3: id3Id}, idr: [], indr: [], sei: []}};
       this.remuxAVCCount = this.remuxAACCount = 0;
       this.fragStartPts = this.fragStartDts = this.gopStartDTS = undefined;
       this.fragStartAVCPos = this._avcTrack.samples.length;
       this.fragStartAACPos = this._aacTrack.samples.length;
       this.nextAvcDts = this.contiguous ? this.remuxer.nextAvcDts : this.timeOffset*this.remuxer.PES_TIMESCALE;
     }
-    this.currentSN = sn;
-    var avcId = this._avcTrack.id,
-        aacId = this._aacTrack.id,
-        id3Id = this._id3Track.id;
 
     // don't parse last TS packet if incomplete
     len -= len % 188;
@@ -301,6 +302,8 @@
     }
     this.remux(null, final, final && sn === lastSN, true);
     if (final) {
+      this.fragStats.keymap.sps = this._avcTrack.sps||undefined;
+      this.fragStats.keymap.pps = this._avcTrack.pps||undefined;
       this.observer.trigger(Event.FRAG_STATISTICS, this.fragStats);
     }
   }
@@ -648,6 +651,17 @@
     };
     pushAccessUnit = pushAccessUnit.bind(this);
 
+    var _addKey = type => {
+      let map = this.fragStats.keymap;
+      let lastPos = -1;
+      lastPos = Math.max(map.idr[map.idr.length-1]||-1, lastPos);
+      lastPos = Math.max(map.indr[map.indr.length-1]||-1, lastPos);
+      lastPos = Math.max(map.sei[map.sei.length-1]||-1, lastPos);
+      if (lastPos !== this.lastAVCFrameStart) {
+        map[type].push(this.lastAVCFrameStart);
+      }
+    };
+
     units.forEach(unit => {
       switch(unit.type) {
         //NDR
@@ -667,7 +681,7 @@
             //if (sliceType === 2 || sliceType === 7) {
             if (sliceType === 2 || sliceType === 4 || sliceType === 7 || sliceType === 9) {
               key = true;
-              this.fragStats.keymap.indr.push(this.lastAVCFrameStart);
+              _addKey('indr');
             }
           }
           break;
@@ -678,7 +692,7 @@
             debugString += 'IDR ';
           }
           key = true;
-          this.fragStats.keymap.idr.push(this.lastAVCFrameStart);
+          _addKey('idr');
           break;
         //SEI
         case 6:
@@ -712,7 +726,7 @@
             // if SEI recovery_point has been found mark as keyframe
             if (!hlsConfig.disableSEIkeyframes && payloadType === 6) {
                 key = true;
-                this.fragStats.keymap.sei.push(this.lastAVCFrameStart);
+                _addKey('sei');
             }
 
             // TODO: there can be more than one payload in an SEI packet...
@@ -773,7 +787,7 @@
             var config = expGolombDecoder.readSPS();
             track.width = config.width;
             track.height = config.height;
-            this.fragStats.keymap.sps = track.sps = [unit.data];
+            track.sps = [unit.data];
             track.duration = this._duration;
             var codecarray = unit.data.subarray(1, 4);
             var codecstring = 'avc1.';
@@ -794,7 +808,7 @@
             debugString += 'PPS ';
           }
           if (!track.pps) {
-            this.fragStats.keymap.pps = track.pps = [unit.data];
+            track.pps = [unit.data];
           }
           break;
         case 9:
