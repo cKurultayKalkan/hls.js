@@ -7457,7 +7457,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-147';
+      return '0.6.1-148';
     }
   }, {
     key: 'Events',
@@ -9286,7 +9286,7 @@ var MP4Remuxer = function () {
         firstDTS = nextAvcDts;
         inputSamples[0].dts = firstDTS + this._initDTS;
         // offset PTS as well, ensure that PTS is smaller or equal than new DTS
-        firstPTS = Math.max(firstPTS - delta * 90, nextAvcDts);
+        firstPTS = Math.min(firstPTS - delta * 90, nextAvcDts);
         inputSamples[0].pts = firstPTS + this._initDTS;
         _logger.logger.log('Video/PTS/DTS adjusted: ' + firstPTS + '/' + firstDTS + ',delta:' + delta);
         stats.videoGap = stats.videoGap || [];

@@ -208,7 +208,7 @@ class MP4Remuxer {
       firstDTS = nextAvcDts;
       inputSamples[0].dts = firstDTS + this._initDTS;
       // offset PTS as well, ensure that PTS is smaller or equal than new DTS
-      firstPTS = Math.max(firstPTS - delta*90, nextAvcDts);
+      firstPTS = Math.min(firstPTS - delta*90, nextAvcDts);
       inputSamples[0].pts = firstPTS + this._initDTS;
       logger.log(`Video/PTS/DTS adjusted: ${firstPTS}/${firstDTS},delta:${delta}`);
       stats.videoGap = stats.videoGap||[];
