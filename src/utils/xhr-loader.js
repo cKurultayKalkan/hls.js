@@ -67,6 +67,7 @@ class XhrLoader {
       url = url.replace(/^http:\/\//, 'https://');
     }
     xhr.open('GET', url, true);
+    xhr.withCredentials = true;
     if (this.byteRange) {
       xhr.setRequestHeader('Range', 'bytes=' + this.byteRange);
     }

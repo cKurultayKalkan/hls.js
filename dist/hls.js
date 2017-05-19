@@ -7457,7 +7457,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-150';
+      return '0.6.1-151';
     }
   }, {
     key: 'Events',
@@ -11736,6 +11736,7 @@ var XhrLoader = function () {
         url = url.replace(/^http:\/\//, 'https://');
       }
       xhr.open('GET', url, true);
+      xhr.withCredentials = true;
       if (this.byteRange) {
         xhr.setRequestHeader('Range', 'bytes=' + this.byteRange);
       }
