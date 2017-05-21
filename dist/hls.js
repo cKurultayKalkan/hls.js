@@ -7457,7 +7457,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-151';
+      return '0.6.1-153';
     }
   }, {
     key: 'Events',
@@ -9291,6 +9291,12 @@ var MP4Remuxer = function () {
         _logger.logger.log('Video/PTS/DTS adjusted: ' + firstPTS + '/' + firstDTS + ',delta:' + delta);
         stats.videoGap = stats.videoGap || [];
         stats.videoGap.push(delta);
+      } else if (this.config.addTsOffset && _browser2.default.isSafari() && delta < 0 && delta > -100 && this.lastDTS) {
+        var d = this.lastDTS - firstDTS;
+        this._initPTS -= d;
+        this._initDTS -= d;
+        firstDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS, nextAvcDts), 0);
+        firstPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS, nextAvcDts), 0);
       }
       nextDTS = firstDTS;
 
@@ -9299,6 +9305,7 @@ var MP4Remuxer = function () {
       lastDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS, nextAvcDts), 0);
       lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS, nextAvcDts), 0);
       lastPTS = Math.max(lastPTS, lastDTS);
+      this.lastDTS = flush ? lastDTS : undefined;
 
       // on Safari let's signal the same sample duration for all samples
       // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
@@ -11736,7 +11743,6 @@ var XhrLoader = function () {
         url = url.replace(/^http:\/\//, 'https://');
       }
       xhr.open('GET', url, true);
-      xhr.withCredentials = true;
       if (this.byteRange) {
         xhr.setRequestHeader('Range', 'bytes=' + this.byteRange);
       }

@@ -197,8 +197,8 @@ class MP4Remuxer {
     let nextAvcDts = contiguous ? this.nextAvcDts : timeOffset*pesTimeScale;
     // compute first DTS and last DTS, normalize them against reference value
     let sample = inputSamples[0];
-    firstDTS =  Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts),0);
-    firstPTS =  Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts),0);
+    firstDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts),0);
+    firstPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts),0);
 
     // check timestamp continuity (to remove inter-fragment gap/hole)
     let delta = Math.round((firstDTS - nextAvcDts) / 90);
@@ -213,6 +213,12 @@ class MP4Remuxer {
       logger.log(`Video/PTS/DTS adjusted: ${firstPTS}/${firstDTS},delta:${delta}`);
       stats.videoGap = stats.videoGap||[];
       stats.videoGap.push(delta);
+    } else if (this.config.addTsOffset && browser.isSafari() && delta < 0 && delta > -100 && this.lastDTS) {
+      let d = this.lastDTS - firstDTS;
+      this._initPTS -= d;
+      this._initDTS -= d;
+      firstDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts),0);
+      firstPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts),0);
     }
     nextDTS = firstDTS;
 
@@ -221,6 +227,7 @@ class MP4Remuxer {
     lastDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts) ,0);
     lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts) ,0);
     lastPTS = Math.max(lastPTS, lastDTS);
+    this.lastDTS = flush ? lastDTS : undefined;
 
     // on Safari let's signal the same sample duration for all samples
     // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
