@@ -7457,7 +7457,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-153';
+      return '0.6.1-154';
     }
   }, {
     key: 'Events',
@@ -9311,7 +9311,7 @@ var MP4Remuxer = function () {
       // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
       // set this constant duration as being the avg delta between consecutive DTS.
       if (_browser2.default.isSafari()) {
-        mp4SampleDuration = Math.round((lastDTS - firstDTS) / (pes2mp4ScaleFactor * (inputSamples.length - 1)));
+        mp4SampleDuration = inputSamples.length > 1 ? Math.round((lastDTS - firstDTS) / (pes2mp4ScaleFactor * (inputSamples.length - 1))) : 0;
       }
 
       // normalize all PTS/DTS now ...

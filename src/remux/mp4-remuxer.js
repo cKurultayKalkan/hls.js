@@ -233,7 +233,7 @@ class MP4Remuxer {
     // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
     // set this constant duration as being the avg delta between consecutive DTS.
     if (browser.isSafari()) {
-      mp4SampleDuration = Math.round((lastDTS-firstDTS)/(pes2mp4ScaleFactor*(inputSamples.length-1)));
+      mp4SampleDuration = inputSamples.length>1 ? Math.round((lastDTS-firstDTS)/(pes2mp4ScaleFactor*(inputSamples.length-1))) : 0;
     }
 
     // normalize all PTS/DTS now ...
