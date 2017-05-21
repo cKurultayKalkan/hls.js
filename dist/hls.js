@@ -5571,7 +5571,7 @@ var TSDemuxer = function () {
       this.accurate = accurate;
       this._duration = duration;
       this.contiguous = false;
-      this.firstSample = first;
+      this.numSample = first ? 0 : this.numSample;
       if (cc !== this.lastCC) {
         _logger.logger.log('discontinuity detected');
         this.insertDiscontinuity();
@@ -5632,6 +5632,7 @@ var TSDemuxer = function () {
           switch (pid) {
             case avcId:
               if (stt) {
+                this.fragStats.keymap.first = this.fragStats.keymap.first || start;
                 if (pes = this._parsePES(avcData)) {
                   this._parseAVCPES(pes);
                   if (codecsOnly) {
@@ -6120,10 +6121,10 @@ var TSDemuxer = function () {
           } else {
             this.fragStats.dropped++;
           }
-          if (this.firstSample && !key) {
+          if (!this.numSample && !key) {
             this.fragStats.notFirstKeyframe++;
           }
-          this.firstSample = false;
+          this.numSample++;
           units2 = [];
           length = 0;
         }
@@ -6133,11 +6134,15 @@ var TSDemuxer = function () {
       var _addKey = function _addKey(type) {
         var map = _this.fragStats.keymap;
         var lastPos = -1;
-        lastPos = Math.max(map.idr[map.idr.length - 1] || -1, lastPos);
-        lastPos = Math.max(map.indr[map.indr.length - 1] || -1, lastPos);
-        lastPos = Math.max(map.sei[map.sei.length - 1] || -1, lastPos);
+        var _arr = ['idr', 'indr', 'sei'];
+        for (var _i = 0; _i < _arr.length; _i++) {
+          var check = _arr[_i];
+          if (map[check].length) {
+            lastPos = Math.max(map[check].slice(-1)[0].offset || -1, lastPos);
+          }
+        }
         if (lastPos !== _this.lastAVCFrameStart) {
-          map[type].push(_this.lastAVCFrameStart);
+          map[type].push({ offset: _this.lastAVCFrameStart, sn: _this.numSample });
         }
       };
 
@@ -7457,7 +7462,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-155';
+      return '0.6.1-156';
     }
   }, {
     key: 'Events',
@@ -7499,6 +7504,7 @@ var Hls = function () {
           maxMaxBufferLength: 40,
           enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
+          enableSmoothStreaming: false,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
           manifestLoadingRetryDelay: 1000,
@@ -7688,6 +7694,11 @@ var Hls = function () {
     key: 'setLogs',
     value: function setLogs(debug) {
       (0, _logger.enableLogs)(debug, this);
+    }
+  }, {
+    key: 'isSmoothStreaming',
+    value: function isSmoothStreaming() {
+      return this.config.enableSmoothStreaming;
     }
   }, {
     key: 'levels',

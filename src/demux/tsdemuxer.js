@@ -114,7 +114,7 @@
     this.accurate = accurate;
     this._duration = duration;
     this.contiguous = false;
-    this.firstSample = first;
+    this.numSample = first ? 0 : this.numSample;
     if (cc !== this.lastCC) {
       logger.log('discontinuity detected');
       this.insertDiscontinuity();
@@ -175,6 +175,7 @@
         switch (pid) {
         case avcId:
             if (stt) {
+              this.fragStats.keymap.first = this.fragStats.keymap.first||start;
               if ((pes = this._parsePES(avcData))) {
                 this._parseAVCPES(pes);
                 if (codecsOnly) {
@@ -641,10 +642,10 @@
         else {
           this.fragStats.dropped++;
         }
-        if (this.firstSample && !key) {
+        if (!this.numSample && !key) {
           this.fragStats.notFirstKeyframe++;
         }
-        this.firstSample = false;
+        this.numSample++;
         units2 = [];
         length = 0;
       }
@@ -654,11 +655,13 @@
     var _addKey = type => {
       let map = this.fragStats.keymap;
       let lastPos = -1;
-      lastPos = Math.max(map.idr[map.idr.length-1]||-1, lastPos);
-      lastPos = Math.max(map.indr[map.indr.length-1]||-1, lastPos);
-      lastPos = Math.max(map.sei[map.sei.length-1]||-1, lastPos);
+      for (let check of ['idr', 'indr', 'sei']) {
+          if (map[check].length) {
+              lastPos = Math.max(map[check].slice(-1)[0].offset||-1, lastPos);
+          }
+      }
       if (lastPos !== this.lastAVCFrameStart) {
-        map[type].push(this.lastAVCFrameStart);
+        map[type].push({offset: this.lastAVCFrameStart, sn: this.numSample});
       }
     };
 

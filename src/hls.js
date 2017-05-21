@@ -90,6 +90,7 @@ class Hls {
           maxMaxBufferLength: 40,
           enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
+          enableSmoothStreaming: false,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
           manifestLoadingRetryDelay: 1000,
@@ -350,6 +351,10 @@ class Hls {
 
   setLogs(debug) {
     enableLogs(debug, this);
+  }
+
+  isSmoothStreaming() {
+    return this.config.enableSmoothStreaming;
   }
 }
 
