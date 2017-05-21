@@ -213,8 +213,9 @@ class MP4Remuxer {
       logger.log(`Video/PTS/DTS adjusted: ${firstPTS}/${firstDTS},delta:${delta}`);
       stats.videoGap = stats.videoGap||[];
       stats.videoGap.push(delta);
-    } else if (this.config.addTsOffset && browser.isSafari() && delta < 0 && delta > -100 && this.lastDTS) {
-      let d = this.lastDTS - firstDTS;
+    } else if (delta && this.lastSamples && this.lastSamples[0].dts === firstDTS) {
+      let d = this.lastSamples[1].dts - firstDTS;
+      logger.log(`detected DTS overlap, add delta:${d} to overcome on Safari`);
       this._initPTS -= d;
       this._initDTS -= d;
       firstDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts),0);
@@ -254,6 +255,8 @@ class MP4Remuxer {
       // ensure pts is a multiple of scale factor to avoid rounding issues
       sample.pts = Math.round(sample.pts/pes2mp4ScaleFactor)*pes2mp4ScaleFactor;
     }
+    this.lastSamples = this.config.addTsOffset && browser.isSafari() && flush && inputSamples.length > 1 ?
+      inputSamples.slice(-2) : undefined;
 
     /* concatenate the video data and construct the mdat in place
       (need 8 more bytes to fill length and mpdat type) */
