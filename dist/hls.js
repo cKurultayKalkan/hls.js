@@ -7462,7 +7462,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-156';
+      return '0.6.1-157';
     }
   }, {
     key: 'Events',
@@ -9302,7 +9302,7 @@ var MP4Remuxer = function () {
         _logger.logger.log('Video/PTS/DTS adjusted: ' + firstPTS + '/' + firstDTS + ',delta:' + delta);
         stats.videoGap = stats.videoGap || [];
         stats.videoGap.push(delta);
-      } else if (delta && this.lastSamples && this.lastSamples[0].dts === firstDTS) {
+      } else if (!contiguous && this.lastSamples && this.lastSamples[0].dts === firstDTS) {
         var d = this.lastSamples[1].dts - firstDTS;
         _logger.logger.log('detected DTS overlap, add delta:' + d + ' to overcome on Safari');
         this._initPTS -= d;
