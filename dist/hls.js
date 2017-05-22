@@ -7462,7 +7462,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-157';
+      return '0.6.1-158';
     }
   }, {
     key: 'Events',
@@ -9317,7 +9317,6 @@ var MP4Remuxer = function () {
       lastDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS, nextAvcDts), 0);
       lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS, nextAvcDts), 0);
       lastPTS = Math.max(lastPTS, lastDTS);
-      this.lastDTS = flush ? lastDTS : undefined;
 
       // on Safari let's signal the same sample duration for all samples
       // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
@@ -9344,7 +9343,7 @@ var MP4Remuxer = function () {
         // ensure pts is a multiple of scale factor to avoid rounding issues
         _sample.pts = Math.round(_sample.pts / pes2mp4ScaleFactor) * pes2mp4ScaleFactor;
       }
-      this.lastSamples = this.config.addTsOffset && _browser2.default.isSafari() && flush && inputSamples.length > 1 ? inputSamples.slice(-2) : undefined;
+      this.lastSamples = _browser2.default.isSafari() && flush && inputSamples.length > 1 ? inputSamples.slice(-2) : undefined;
 
       /* concatenate the video data and construct the mdat in place
         (need 8 more bytes to fill length and mpdat type) */

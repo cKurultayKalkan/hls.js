@@ -228,7 +228,6 @@ class MP4Remuxer {
     lastDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts) ,0);
     lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts) ,0);
     lastPTS = Math.max(lastPTS, lastDTS);
-    this.lastDTS = flush ? lastDTS : undefined;
 
     // on Safari let's signal the same sample duration for all samples
     // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
@@ -255,7 +254,7 @@ class MP4Remuxer {
       // ensure pts is a multiple of scale factor to avoid rounding issues
       sample.pts = Math.round(sample.pts/pes2mp4ScaleFactor)*pes2mp4ScaleFactor;
     }
-    this.lastSamples = this.config.addTsOffset && browser.isSafari() && flush && inputSamples.length > 1 ?
+    this.lastSamples = browser.isSafari() && flush && inputSamples.length > 1 ?
       inputSamples.slice(-2) : undefined;
 
     /* concatenate the video data and construct the mdat in place
