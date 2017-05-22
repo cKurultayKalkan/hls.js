@@ -37,16 +37,18 @@ class DemuxerInline {
   push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
     var demuxer = this.demuxer;
     if (!demuxer) {
-      var hls = this.hls;
+      var hls = this.hls,
+        config = this.config,
+        typeSupported = this.typeSupported;
       // probe for content type
       if (TSDemuxer.probe(data)) {
-        if (this.typeSupported.mp2t === true) {
-          demuxer = new TSDemuxer(hls, PassThroughRemuxer, this.config, this.typeSupported);
+        if (typeSupported.mp2t === true) {
+          demuxer = new TSDemuxer(hls, PassThroughRemuxer, config, typeSupported);
         } else {
-          demuxer = new TSDemuxer(hls, MP4Remuxer, this.config, this.typeSupported);
+          demuxer = new TSDemuxer(hls, MP4Remuxer, config, typeSupported);
         }
       } else if(AACDemuxer.probe(data)) {
-        demuxer = new AACDemuxer(hls, MP4Remuxer, this.config, this.typeSupported);
+        demuxer = new AACDemuxer(hls, MP4Remuxer, config, typeSupported);
       } else {
         let i, len = data.length, info = `len:${len} [`;
         for (i = 0, len = Math.min(len, 10); i<len; i++) {

@@ -4223,7 +4223,7 @@ var AACDemuxer = function () {
     this.remuxerClass = remuxerClass;
     this.config = config;
     this.remuxer = new this.remuxerClass(observer, config, typeSupported);
-    this._aacTrack = { container: 'audio/adts', type: 'audio', id: -1, sequenceNumber: 0, samples: [], len: 0 };
+    this._aacTrack = { container: 'audio/adts', type: 'audio', id: -1, sequenceNumber: 0, isAAC: true, samples: [], len: 0 };
   }
 
   _createClass(AACDemuxer, [{
@@ -4552,16 +4552,18 @@ var DemuxerInline = function () {
     value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
       var demuxer = this.demuxer;
       if (!demuxer) {
-        var hls = this.hls;
+        var hls = this.hls,
+            config = this.config,
+            typeSupported = this.typeSupported;
         // probe for content type
         if (_tsdemuxer2.default.probe(data)) {
-          if (this.typeSupported.mp2t === true) {
-            demuxer = new _tsdemuxer2.default(hls, _passthroughRemuxer2.default, this.config, this.typeSupported);
+          if (typeSupported.mp2t === true) {
+            demuxer = new _tsdemuxer2.default(hls, _passthroughRemuxer2.default, config, typeSupported);
           } else {
-            demuxer = new _tsdemuxer2.default(hls, _mp4Remuxer2.default, this.config, this.typeSupported);
+            demuxer = new _tsdemuxer2.default(hls, _mp4Remuxer2.default, config, typeSupported);
           }
         } else if (_aacdemuxer2.default.probe(data)) {
-          demuxer = new _aacdemuxer2.default(hls, _mp4Remuxer2.default, this.config, this.typeSupported);
+          demuxer = new _aacdemuxer2.default(hls, _mp4Remuxer2.default, config, typeSupported);
         } else {
           var i = void 0,
               len = data.length,
@@ -7462,7 +7464,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-158';
+      return '0.6.1-159';
     }
   }, {
     key: 'Events',
