@@ -1112,7 +1112,7 @@ class StreamController extends EventHandler {
         frag.deltaPTS = this.config.maxSeekHole+1;
       }
       const sameLevel = fragPrevious && frag.level === fragPrevious.level;
-      if (this.hls.config.backtrackOnDrop && !details.live && !data.isPartial && !sameLevel) {
+      if (!this.config.disableBacktrack && !details.live && !data.isPartial && !sameLevel) {
         const curSNIdx = frag.sn - details.startSN;
         let detFrag = details.fragments[curSNIdx];
         if (curSNIdx) {

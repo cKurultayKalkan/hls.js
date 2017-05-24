@@ -3113,7 +3113,7 @@ var StreamController = function (_EventHandler) {
           frag.deltaPTS = this.config.maxSeekHole + 1;
         }
         var sameLevel = fragPrevious && frag.level === fragPrevious.level;
-        if (this.hls.config.backtrackOnDrop && !details.live && !data.isPartial && !sameLevel) {
+        if (!this.config.disableBacktrack && !details.live && !data.isPartial && !sameLevel) {
           var curSNIdx = frag.sn - details.startSN;
           var detFrag = details.fragments[curSNIdx];
           if (curSNIdx) {
@@ -7464,7 +7464,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-159';
+      return '0.6.1-160';
     }
   }, {
     key: 'Events',
