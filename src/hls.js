@@ -90,7 +90,7 @@ class Hls {
           maxMaxBufferLength: 40,
           enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
-          enableSmoothStreaming: false,
+          enableSmoothStreaming: true,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
           manifestLoadingRetryDelay: 1000,

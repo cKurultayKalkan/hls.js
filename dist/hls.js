@@ -2935,6 +2935,26 @@ var StreamController = function (_EventHandler) {
       var fragCurrent = this.fragCurrent;
       if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) && fragCurrent && data.frag.level === fragCurrent.level && data.frag.sn === fragCurrent.sn) {
         _logger.logger.log('Loaded chunk ' + data.payload.byteLength + ' of frag ' + fragCurrent.sn + ' of level ' + fragCurrent.level);
+        if (data.payload.keymaps) {
+          var keymaps = data.payload.keymaps;
+          this.savedKeymaps = Object.assign(this.savedKeymaps || {}, keymaps);
+          if (!('old_map' in this.savedKeymaps) || !('new_map' in this.savedKeymaps)) {
+            this.savedChunk = new Uint8Array(data.payload);
+            return;
+          }
+          if (this.savedChunk) {
+            var newdata = new Uint8Array(data.payload.byteLength + this.savedChunk.byteLength);
+            newdata.set('old_map' in keymaps ? new Uint8Array(data.payload) : this.savedChunk);
+            newdata.set('old_map' in keymaps ? this.savedChunk : new Uint8Array(data.payload), 'old_map' in keymaps ? data.payload.byteLength : this.savedChunk.byteLength);
+            data.payload = newdata.buffer;
+            data.payload.first = data.payload.final = true;
+            delete this.savedChunk;
+          }
+          var keymapObject = data.payload.keymaps = this.savedKeymaps.new_map; // jshint ignore:line
+          keymapObject.switchPoint = this.savedKeymaps.old_map.len; // jshint ignore:line
+          keymapObject.firstSN = keymapObject.idr[0].sn || keymapObject.sei[0].sn || keymapObject.indr[0].sn;
+          delete this.savedKeymaps;
+        }
         this.state = State.PARSING;
         // transmux the MPEG-TS data to ISO-BMFF segments
         this.stats = data.stats;
@@ -4549,7 +4569,7 @@ var DemuxerInline = function () {
     }
   }, {
     key: 'push',
-    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
+    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps) {
       var demuxer = this.demuxer;
       if (!demuxer) {
         var hls = this.hls,
@@ -4588,7 +4608,7 @@ var DemuxerInline = function () {
       if (first) {
         this.timeOffset = timeOffset;
       }
-      demuxer.push(data, audioCodec, videoCodec, this.timeOffset, cc, level, sn, duration, accurate, first, final, lastSN);
+      demuxer.push(data, audioCodec, videoCodec, this.timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps);
     }
   }]);
 
@@ -4638,13 +4658,13 @@ var DemuxerWorker = function DemuxerWorker(self) {
   };
   self.addEventListener('message', function (ev) {
     var data = ev.data;
-    //console.log('demuxer cmd:' + data.cmd);
+    // console.log('demuxer cmd:' + data.cmd);
     switch (data.cmd) {
       case 'init':
         self.demuxer = new _demuxerInline2.default(observer, data.typeSupported, JSON.parse(data.config));
         break;
       case 'demux':
-        self.demuxer.push(new Uint8Array(data.data), data.audioCodec, data.videoCodec, data.timeOffset, data.cc, data.level, data.sn, data.duration, data.accurate, data.first, data.final, data.lastSN);
+        self.demuxer.push(new Uint8Array(data.data), data.audioCodec, data.videoCodec, data.timeOffset, data.cc, data.level, data.sn, data.duration, data.accurate, data.first, data.final, data.lastSN, data.keymaps);
         break;
       case 'empty':
         self.postMessage({ event: _events2.default.DEMUXER_QUEUE_EMPTY });
@@ -4778,9 +4798,9 @@ var Demuxer = function () {
     value: function pushDecrypted(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
       if (this.w) {
         // post fragment payload as transferable objects (no copy)
-        this.w.postMessage({ cmd: 'demux', data: data, audioCodec: audioCodec, videoCodec: videoCodec, timeOffset: timeOffset, cc: cc, level: level, sn: sn, duration: duration, accurate: accurate, first: first, final: final, lastSN: lastSN }, [data]);
+        this.w.postMessage({ cmd: 'demux', data: data, audioCodec: audioCodec, videoCodec: videoCodec, timeOffset: timeOffset, cc: cc, level: level, sn: sn, duration: duration, accurate: accurate, first: first, final: final, lastSN: lastSN, keymaps: data.keymaps }, [data]);
       } else {
-        this.demuxer.push(new Uint8Array(data), audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN);
+        this.demuxer.push(new Uint8Array(data), audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, data.keymaps);
       }
     }
   }, {
@@ -4793,7 +4813,7 @@ var Demuxer = function () {
       var traillen = this.trail.length;
       // 752 = 4*188. We need number of bytes to be multiplier of 16 to
       // perform chained AES decryption
-      if (traillen || (data.byteLength + traillen) % 752) {
+      if (traillen || (data.byteLength + traillen) % 752 && !data.final) {
         var final = data.final,
             first = data.first || this.trail.first || false;
         // add trailing bytes
@@ -5502,11 +5522,12 @@ var TSDemuxer = function () {
     }
   }, {
     key: 'switchLevel',
-    value: function switchLevel() {
+    value: function switchLevel(smooth) {
       // flush end of previous segment
       if (this._avcTrack.samples.length) {
         this.remux(null, false, true, false);
       }
+      delete this.audioConfig;
       this.pmtParsed = false;
       this._pmtId = -1;
       this._setEmptyTracks(true);
@@ -5516,7 +5537,7 @@ var TSDemuxer = function () {
       this.aacOverFlow = null;
       this.aacLastPTS = null;
       this.avcNaluState = 0;
-      this.remuxer.switchLevel();
+      this.remuxer.switchLevel(smooth);
     }
   }, {
     key: '_clearAvcData',
@@ -5551,7 +5572,9 @@ var TSDemuxer = function () {
 
   }, {
     key: 'push',
-    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
+    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps) {
+      var _this = this;
+
       var avcData = this._avcData,
           aacData = this._aacData,
           pes,
@@ -5566,6 +5589,13 @@ var TSDemuxer = function () {
           offset,
           codecsOnly = this.remuxer.passthrough,
           unknownPIDs = false;
+      var convertPS = function convertPS(tag) {
+        if (tag in keymaps) {
+          _this._avcTrack[tag] = keymaps[tag].map(function (el) {
+            return new Uint8Array(el);
+          });
+        }
+      };
       this.audioCodec = audioCodec;
       this.videoCodec = videoCodec;
       this.timeOffset = timeOffset;
@@ -5579,7 +5609,7 @@ var TSDemuxer = function () {
         this.insertDiscontinuity();
         this.lastCC = cc;
       }
-      var trackSwitch = level !== this.lastLevel;
+      var trackSwitch = level !== this.lastLevel && !keymaps;
       if (trackSwitch) {
         _logger.logger.log('level switch detected');
         this.switchLevel();
@@ -5602,6 +5632,7 @@ var TSDemuxer = function () {
           id3Id = this._id3Track.id;
 
       if (first) {
+        delete this.audioConfig;
         this.lastContiguous = !trackSwitch && sn === this.lastSN + 1;
         this.fragStats = { framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: { pmt: { aac: aacId, avc: avcId, id3: id3Id }, idr: [], indr: [], sei: [] } };
         this.remuxAVCCount = this.remuxAACCount = 0;
@@ -5649,6 +5680,25 @@ var TSDemuxer = function () {
                 }
                 this.lastAVCFrameStart = start;
                 avcData = this._clearAvcData(start);
+                if (keymaps && this.numSample === keymaps.firstSN) {
+                  this.switchLevel(true);
+                  this.lastLevel = level;
+                  avcData = this._avcData;
+                  aacData = this._aacData;
+                  id3Data = this._id3Data;
+                  start = keymaps.switchPoint - 188;
+                  if (keymaps.pmtId !== undefined) {
+                    this._pmtId = keymaps.pmtId;
+                  }
+                  if (keymaps.pmt) {
+                    avcId = this._avcTrack.id = keymaps.pmt.avc;
+                    aacId = this._aacTrack.id = keymaps.pmt.aac;
+                    id3Id = this._id3Track.id = keymaps.pmt.id3;
+                  }
+                  ['sps', 'pps'].forEach(convertPS);
+                  delete keymaps.firstSN;
+                  continue;
+                }
               }
               avcData.data.push(data.subarray(offset, start + 188));
               avcData.size += start + 188 - offset;
@@ -5765,6 +5815,9 @@ var TSDemuxer = function () {
       if (final) {
         this.fragStats.keymap.sps = this._avcTrack.sps || undefined;
         this.fragStats.keymap.pps = this._avcTrack.pps || undefined;
+        if (keymaps) {
+          delete this.fragStats.keymap;
+        }
         this.observer.trigger(_events2.default.FRAG_STATISTICS, this.fragStats);
       }
     }
@@ -6073,7 +6126,7 @@ var TSDemuxer = function () {
   }, {
     key: '_parseAVCPES',
     value: function _parseAVCPES(pes) {
-      var _this = this;
+      var _this2 = this;
 
       var track = this._avcTrack,
           samples = track.samples,
@@ -6134,7 +6187,7 @@ var TSDemuxer = function () {
       pushAccessUnit = pushAccessUnit.bind(this);
 
       var _addKey = function _addKey(type) {
-        var map = _this.fragStats.keymap;
+        var map = _this2.fragStats.keymap;
         var lastPos = -1;
         var _arr = ['idr', 'indr', 'sei'];
         for (var _i = 0; _i < _arr.length; _i++) {
@@ -6143,8 +6196,8 @@ var TSDemuxer = function () {
             lastPos = Math.max(map[check].slice(-1)[0].offset || -1, lastPos);
           }
         }
-        if (lastPos !== _this.lastAVCFrameStart) {
-          map[type].push({ offset: _this.lastAVCFrameStart, sn: _this.numSample });
+        if (lastPos !== _this2.lastAVCFrameStart) {
+          map[type].push({ offset: _this2.lastAVCFrameStart, sn: _this2.numSample });
         }
       };
 
@@ -6186,7 +6239,7 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'SEI ';
             }
-            expGolombDecoder = new _expGolomb2.default(_this.discardEPB(unit.data));
+            expGolombDecoder = new _expGolomb2.default(_this2.discardEPB(unit.data));
 
             // skip frameType
             expGolombDecoder.readUByte();
@@ -6247,7 +6300,7 @@ var TSDemuxer = function () {
                           byteArray.push(expGolombDecoder.readUByte());
                         }
 
-                        _this._insertSampleInOrder(_this._txtTrack.samples, { type: 3, pts: pes.pts, bytes: byteArray });
+                        _this2._insertSampleInOrder(_this2._txtTrack.samples, { type: 3, pts: pes.pts, bytes: byteArray });
                       }
                     }
                   }
@@ -6271,7 +6324,7 @@ var TSDemuxer = function () {
               track.width = config.width;
               track.height = config.height;
               track.sps = [unit.data];
-              track.duration = _this._duration;
+              track.duration = _this2._duration;
               var codecarray = unit.data.subarray(1, 4);
               var codecstring = 'avc1.';
               for (i = 0; i < 3; i++) {
@@ -6540,8 +6593,8 @@ var TSDemuxer = function () {
           return;
         }
       }
-      config = _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec);
-      if (track.audiosamplerate !== config.samplerate || track.codec !== config.codec) {
+      this.audioConfig = config = this.audioConfig || _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec);
+      if (config && (track.audiosamplerate !== config.samplerate || track.codec !== config.codec)) {
         track.config = config.config;
         track.audiosamplerate = config.samplerate;
         track.channelCount = config.channelCount;
@@ -7464,7 +7517,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-160';
+      return '0.6.1-161';
     }
   }, {
     key: 'Events',
@@ -7506,7 +7559,7 @@ var Hls = function () {
           maxMaxBufferLength: 40,
           enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
-          enableSmoothStreaming: false,
+          enableSmoothStreaming: true,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
           manifestLoadingRetryDelay: 1000,
@@ -9113,9 +9166,11 @@ var MP4Remuxer = function () {
     }
   }, {
     key: 'switchLevel',
-    value: function switchLevel() {
+    value: function switchLevel(smooth) {
       this.ISGenerated = false;
-      this.nextAacPts = this.nextAvcDts = undefined;
+      if (!smooth) {
+        this.nextAacPts = this.nextAvcDts = undefined;
+      }
     }
   }, {
     key: 'remux',

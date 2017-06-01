@@ -62,11 +62,12 @@
     return (data.length >= 3*188 && data[0] === 0x47 && data[188] === 0x47 && data[2*188] === 0x47);
   }
 
-  switchLevel() {
+  switchLevel(smooth) {
     // flush end of previous segment
     if (this._avcTrack.samples.length) {
       this.remux(null, false, true, false);
     }
+    delete this.audioConfig;
     this.pmtParsed = false;
     this._pmtId = -1;
     this._setEmptyTracks(true);
@@ -76,7 +77,7 @@
     this.aacOverFlow = null;
     this.aacLastPTS = null;
     this.avcNaluState = 0;
-    this.remuxer.switchLevel();
+    this.remuxer.switchLevel(smooth);
   }
 
   _clearAvcData(offset){
@@ -103,10 +104,15 @@
   }
 
   // feed incoming data to the front of the parsing pipeline
-  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN){
+  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps){
     var avcData = this._avcData, aacData = this._aacData, pes,
         id3Data = this._id3Data, start, len = data.length, stt, pid, atf, info, num,
         offset, codecsOnly = this.remuxer.passthrough, unknownPIDs = false;
+    let convertPS = tag => {
+      if (tag in keymaps) {
+        this._avcTrack[tag] = keymaps[tag].map(el => new Uint8Array(el));
+      }
+    };
     this.audioCodec = audioCodec;
     this.videoCodec = videoCodec;
     this.timeOffset = timeOffset;
@@ -120,7 +126,7 @@
       this.insertDiscontinuity();
       this.lastCC = cc;
     }
-    const trackSwitch = level !== this.lastLevel;
+    const trackSwitch = level !== this.lastLevel && !keymaps;
     if (trackSwitch) {
       logger.log('level switch detected');
       this.switchLevel();
@@ -143,6 +149,7 @@
         id3Id = this._id3Track.id;
 
     if (first) {
+      delete this.audioConfig;
       this.lastContiguous = !trackSwitch && sn === this.lastSN+1;
       this.fragStats = {framesCount: 0, keyFrames: 0, dropped: 0, segment: sn, level: level, notFirstKeyframe: 0, keymap: {pmt: {aac: aacId, avc: avcId, id3: id3Id}, idr: [], indr: [], sei: []}};
       this.remuxAVCCount = this.remuxAACCount = 0;
@@ -190,6 +197,25 @@
               }
               this.lastAVCFrameStart = start;
               avcData = this._clearAvcData(start);
+              if (keymaps && this.numSample === keymaps.firstSN) {
+                this.switchLevel(true);
+                this.lastLevel = level;
+                avcData = this._avcData;
+                aacData = this._aacData;
+                id3Data = this._id3Data;
+                start = keymaps.switchPoint-188;
+                if (keymaps.pmtId !== undefined) {
+                  this._pmtId = keymaps.pmtId;
+                }
+                if (keymaps.pmt) {
+                  avcId = this._avcTrack.id = keymaps.pmt.avc;
+                  aacId = this._aacTrack.id = keymaps.pmt.aac;
+                  id3Id = this._id3Track.id = keymaps.pmt.id3;
+                }
+                ['sps', 'pps'].forEach(convertPS);
+                delete keymaps.firstSN;
+                continue;
+              }
             }
             avcData.data.push(data.subarray(offset, start + 188));
             avcData.size += start + 188 - offset;
@@ -305,6 +331,9 @@
     if (final) {
       this.fragStats.keymap.sps = this._avcTrack.sps||undefined;
       this.fragStats.keymap.pps = this._avcTrack.pps||undefined;
+      if (keymaps) {
+        delete this.fragStats.keymap;
+      }
       this.observer.trigger(Event.FRAG_STATISTICS, this.fragStats);
     }
   }
@@ -1042,8 +1071,8 @@
         return;
       }
     }
-    config = ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
-    if (track.audiosamplerate !== config.samplerate || track.codec !== config.codec) {
+    this.audioConfig = config = this.audioConfig || ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
+    if (config && (track.audiosamplerate !== config.samplerate || track.codec !== config.codec)) {
       track.config = config.config;
       track.audiosamplerate = config.samplerate;
       track.channelCount = config.channelCount;

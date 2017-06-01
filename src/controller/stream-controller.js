@@ -942,6 +942,26 @@ class StreamController extends EventHandler {
         fragCurrent && data.frag.level === fragCurrent.level &&
         data.frag.sn === fragCurrent.sn) {
       logger.log(`Loaded chunk ${data.payload.byteLength} of frag ${fragCurrent.sn} of level ${fragCurrent.level}`);
+      if (data.payload.keymaps) {
+          var keymaps = data.payload.keymaps;
+          this.savedKeymaps = Object.assign(this.savedKeymaps||{}, keymaps);
+          if (!('old_map' in this.savedKeymaps) || !('new_map' in this.savedKeymaps)) {
+              this.savedChunk = new Uint8Array(data.payload);
+              return;
+          }
+          if (this.savedChunk) {
+              let newdata = new Uint8Array(data.payload.byteLength+this.savedChunk.byteLength);
+              newdata.set('old_map' in keymaps ? new Uint8Array(data.payload) : this.savedChunk);
+              newdata.set('old_map' in keymaps ? this.savedChunk : new Uint8Array(data.payload), 'old_map' in keymaps ? data.payload.byteLength : this.savedChunk.byteLength);
+              data.payload = newdata.buffer;
+              data.payload.first = data.payload.final = true;
+              delete this.savedChunk;
+          }
+          let keymapObject = data.payload.keymaps = this.savedKeymaps.new_map; // jshint ignore:line
+          keymapObject.switchPoint = this.savedKeymaps.old_map.len; // jshint ignore:line
+          keymapObject.firstSN = keymapObject.idr[0].sn || keymapObject.sei[0].sn || keymapObject.indr[0].sn;
+          delete this.savedKeymaps;
+      }
       this.state = State.PARSING;
       // transmux the MPEG-TS data to ISO-BMFF segments
       this.stats = data.stats;

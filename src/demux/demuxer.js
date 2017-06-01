@@ -54,9 +54,9 @@ class Demuxer {
   pushDecrypted(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
     if (this.w) {
       // post fragment payload as transferable objects (no copy)
-      this.w.postMessage({cmd: 'demux', data: data, audioCodec: audioCodec, videoCodec: videoCodec, timeOffset: timeOffset, cc: cc, level: level, sn : sn, duration: duration, accurate: accurate, first: first, final: final, lastSN: lastSN}, [data]);
+      this.w.postMessage({cmd: 'demux', data: data, audioCodec: audioCodec, videoCodec: videoCodec, timeOffset: timeOffset, cc: cc, level: level, sn : sn, duration: duration, accurate: accurate, first: first, final: final, lastSN: lastSN, keymaps: data.keymaps}, [data]);
     } else {
-      this.demuxer.push(new Uint8Array(data), audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN);
+      this.demuxer.push(new Uint8Array(data), audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, data.keymaps);
     }
   }
 
@@ -68,7 +68,7 @@ class Demuxer {
     var traillen = this.trail.length;
     // 752 = 4*188. We need number of bytes to be multiplier of 16 to
     // perform chained AES decryption
-    if (traillen || (data.byteLength+traillen)%752) {
+    if (traillen || (data.byteLength+traillen)%752 && !data.final) {
       var final = data.final, first = data.first||this.trail.first||false;
       // add trailing bytes
       var newlen = data.byteLength+traillen;

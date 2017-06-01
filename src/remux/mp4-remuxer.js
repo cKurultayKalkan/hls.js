@@ -33,9 +33,11 @@ class MP4Remuxer {
     this._initPTS = this._initDTS = undefined;
   }
 
-  switchLevel() {
+  switchLevel(smooth) {
     this.ISGenerated = false;
-    this.nextAacPts = this.nextAvcDts = undefined;
+    if (!smooth) {
+      this.nextAacPts = this.nextAvcDts = undefined;
+    }
   }
 
   remux(audioTrack,videoTrack,id3Track,textTrack,timeOffset, contiguous, accurate, data, flush, stats, isPartial) {
