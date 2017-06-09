@@ -2748,23 +2748,31 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'onMediaSeeking',
     value: function onMediaSeeking() {
-      var currentTime = this.media.currentTime;
+      var media = this.media,
+          currentTime = media ? media.currentTime : undefined;
       _logger.logger.log('media seeking to ' + currentTime);
       var fragCurrent = this.fragCurrent;
       if (this.state === State.FRAG_LOADING) {
-        // check if currently loaded fragment is inside buffer.
-        //if outside, cancel fragment loading, otherwise do nothing
-        if (_bufferHelper2.default.bufferInfo(this.media, currentTime, 0).len === 0) {
-          _logger.logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
-          if (fragCurrent) {
+        var bufferInfo = _bufferHelper2.default.bufferInfo(media, currentTime, this.config.maxBufferHole);
+        // check if we are seeking to a unbuffered area AND if frag loading is in progress
+        if (bufferInfo.len === 0 && fragCurrent) {
+          var fragPrevious = this.fragPrevious,
+              checkPrevious = fragPrevious && fragCurrent.sn - fragPrevious.sn === 1,
+              fragStartOffset = checkPrevious ? fragPrevious.start : fragCurrent.start,
+              fragEndOffset = fragStartOffset + (checkPrevious ? fragPrevious.duration : 0) + fragCurrent.duration;
+          // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
+          if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
+            _logger.logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
             if (fragCurrent.loader) {
               fragCurrent.loader.abort();
             }
             this.fragCurrent = null;
+            this.fragPrevious = null;
+            // switch to IDLE state to load new fragment
+            this.state = State.IDLE;
+          } else {
+            _logger.logger.log('seeking outside of buffer but within currently loaded fragment range');
           }
-          this.fragPrevious = null;
-          // switch to IDLE state to load new fragment
-          this.state = State.IDLE;
         }
       } else if (this.state === State.ENDED) {
         // switch to IDLE state to check for potential new fragment
@@ -2773,7 +2781,7 @@ var StreamController = function (_EventHandler) {
         _logger.logger.log('mediaController: no final chunk, switch back to IDLE state');
         this.state = State.IDLE;
       }
-      if (this.media) {
+      if (media) {
         this.lastCurrentTime = currentTime;
       }
       // avoid reporting fragment loop loading error in case user is seeking several times on same position
@@ -7523,7 +7531,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-162';
+      return '0.6.1-163';
     }
   }, {
     key: 'Events',

@@ -756,23 +756,30 @@ class StreamController extends EventHandler {
   }
 
   onMediaSeeking() {
-    let currentTime = this.media.currentTime;
+    let media = this.media, currentTime = media ? media.currentTime : undefined;
     logger.log('media seeking to ' + currentTime);
-    var fragCurrent = this.fragCurrent;
+    let fragCurrent = this.fragCurrent;
     if (this.state === State.FRAG_LOADING) {
-      // check if currently loaded fragment is inside buffer.
-      //if outside, cancel fragment loading, otherwise do nothing
-      if (BufferHelper.bufferInfo(this.media,currentTime,0).len === 0) {
-        logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
-        if (fragCurrent) {
+      let bufferInfo = BufferHelper.bufferInfo(media, currentTime, this.config.maxBufferHole);
+      // check if we are seeking to a unbuffered area AND if frag loading is in progress
+      if (bufferInfo.len === 0 && fragCurrent) {
+        let fragPrevious = this.fragPrevious,
+          checkPrevious = fragPrevious && fragCurrent.sn - fragPrevious.sn === 1,
+          fragStartOffset = checkPrevious ? fragPrevious.start : fragCurrent.start,
+          fragEndOffset = fragStartOffset + (checkPrevious ? fragPrevious.duration : 0) + fragCurrent.duration;
+        // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
+        if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
+          logger.log('seeking outside of buffer while fragment load in progress, cancel fragment load');
           if (fragCurrent.loader) {
             fragCurrent.loader.abort();
           }
           this.fragCurrent = null;
+          this.fragPrevious = null;
+          // switch to IDLE state to load new fragment
+          this.state = State.IDLE;
+        } else {
+          logger.log('seeking outside of buffer but within currently loaded fragment range');
         }
-        this.fragPrevious = null;
-        // switch to IDLE state to load new fragment
-        this.state = State.IDLE;
       }
     } else if (this.state === State.ENDED) {
       // switch to IDLE state to check for potential new fragment
@@ -781,7 +788,7 @@ class StreamController extends EventHandler {
       logger.log(`mediaController: no final chunk, switch back to IDLE state`);
       this.state = State.IDLE;
     }
-    if (this.media) {
+    if (media) {
       this.lastCurrentTime = currentTime;
     }
     // avoid reporting fragment loop loading error in case user is seeking several times on same position
