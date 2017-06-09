@@ -588,6 +588,12 @@ var AbrController = function (_EventHandler) {
           maxAutoLevel;
       if (this._autoLevelCapping === -1 && hls.levels && hls.levels.length) {
         maxAutoLevel = hls.levels.length - 1;
+        if (this.maxLevelBitrate) {
+          for (i = maxAutoLevel; i >= 0 && hls.levels[i].bitrate > this.maxLevelBitrate; i--) {}
+          if (i > 0) {
+            maxAutoLevel = i;
+          }
+        }
       } else {
         maxAutoLevel = this._autoLevelCapping;
       }
@@ -7517,7 +7523,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-161';
+      return '0.6.1-162';
     }
   }, {
     key: 'Events',
@@ -7889,6 +7895,14 @@ var Hls = function () {
     key: 'manualLevel',
     get: function get() {
       return this.levelController.manualLevel;
+    }
+  }, {
+    key: 'maxLevelBitrate',
+    set: function set(bitrate) {
+      this.abrController.maxLevelBitrate = bitrate;
+    },
+    get: function get() {
+      return this.abrController.maxLevelBitrate;
     }
   }]);
 

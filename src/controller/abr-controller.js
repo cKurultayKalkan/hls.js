@@ -154,6 +154,12 @@ class AbrController extends EventHandler {
     var lastbw = this.lastbw, hls = this.hls,adjustedbw, i, maxAutoLevel;
     if (this._autoLevelCapping === -1 && hls.levels && hls.levels.length) {
       maxAutoLevel = hls.levels.length - 1;
+      if (this.maxLevelBitrate) {
+        for (i = maxAutoLevel; i >= 0 && hls.levels[i].bitrate > this.maxLevelBitrate; i--) {}
+        if (i>0) {
+          maxAutoLevel = i;
+        }
+      }
     } else {
       maxAutoLevel = this._autoLevelCapping;
     }

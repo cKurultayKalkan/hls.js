@@ -356,6 +356,14 @@ class Hls {
   isSmoothStreaming() {
     return this.config.enableSmoothStreaming;
   }
+
+  set maxLevelBitrate(bitrate) {
+    this.abrController.maxLevelBitrate = bitrate;
+  }
+
+  get maxLevelBitrate() {
+    return this.abrController.maxLevelBitrate;
+  }
 }
 
 Hls.api = new EventEmitter();
