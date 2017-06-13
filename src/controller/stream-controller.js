@@ -1267,6 +1267,10 @@ class StreamController extends EventHandler {
                 break;
               }
             }
+            if (i === media.buffered.length) {
+              i = 0;
+              startPosition = media.buffered.start(i);
+            }
             if (browser.isSafari()) {
               startPosition += 0.001;
             }

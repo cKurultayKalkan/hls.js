@@ -3284,6 +3284,10 @@ var StreamController = function (_EventHandler) {
                   break;
                 }
               }
+              if (i === media.buffered.length) {
+                i = 0;
+                startPosition = media.buffered.start(i);
+              }
               if (_browser2.default.isSafari()) {
                 startPosition += 0.001;
               }
@@ -7531,7 +7535,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-163';
+      return '0.6.1-164';
     }
   }, {
     key: 'Events',
