@@ -39,14 +39,14 @@
       params.sps = track.sps || oldParams.sps;
       params.pps = track.pps || oldParams.pps;
     }
-    this._avcTrack = Object.assign({}, this._avcTrack, {container : 'video/mp2t', type: 'video', samples : [], len : 0, nbNalu : 0});
+    this._avcTrack = Object.assign({}, this._avcTrack, {container : 'video/mp2t',inputTimeScale: 90000, type: 'video', samples : [], len : 0, nbNalu : 0});
     if (clearParams) {
       delete this._avcTrack.sps;
       delete this._avcTrack.pps;
     }
-    this._aacTrack = Object.assign({}, this._aacTrack, {container : 'video/mp2t', type: 'audio', samples : [], len : 0, isAAC: true});
-    this._id3Track = Object.assign({}, this._id3Track, {type: 'id3', samples : [], len : 0});
-    this._txtTrack = Object.assign({}, this._txtTrack, {type: 'text', samples: [], len: 0});
+    this._aacTrack = Object.assign({}, this._aacTrack, {container : 'video/mp2t',inputTimeScale: 90000, type: 'audio', samples : [], len : 0, isAAC: true});
+    this._id3Track = Object.assign({}, this._id3Track, {type: 'id3', samples : [],inputTimeScale: 90000, len : 0});
+    this._txtTrack = Object.assign({}, this._txtTrack, {type: 'text', samples: [],inputTimeScale: 90000, len: 0});
     this._avcTrack.sequenceNumber = this._avcTrack.sequenceNumber|0;
     this._aacTrack.sequenceNumber = this._aacTrack.sequenceNumber|0;
     this._id3Track.sequenceNumber = this._id3Track.sequenceNumber|0;
@@ -372,32 +372,59 @@
   remux(data, final, flush, lastSegment) {
     var _saveAVCSamples = [], _saveAACSamples = [], _saveID3Samples = [],
         _saveTextSamples = [], maxk, samples = this._avcTrack.samples,
-        segStartDTS, segEndDTS, gopEndDTS, initDTS;
+        segStartDTS, segEndDTS, gopEndDTS, initDTS, reinit;
     let timescale = this.remuxer.PES_TIMESCALE;
     if (samples.length && final) {
-      initDTS = this.remuxer._initDTS === undefined ?
-        samples[0].dts -timescale * this.timeOffset : this.remuxer._initDTS;
-      let startDTS = Math.max(this.remuxer._PTSNormalize((this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS) - initDTS,this.nextAvcDts),0);
+      reinit = this.remuxer._initDTS === undefined ||
+        this.accurate && Math.abs(samples[0].dts-this.remuxer.nextAvcDts-
+          this.remuxer._initDTS) > this.config.maxBufferHole*timescale &&
+        Math.abs(this._aacTrack.samples.length &&
+          this._aacTrack.samples[0].pts-this.remuxer.nextAacPts-
+          this.remuxer._initDTS) > this.config.maxBufferHole*timescale;
+      initDTS = reinit ?
+        samples[0].dts-timescale * this.timeOffset : this.remuxer._initDTS;
+      // if we have a big gap (>maxBufferHole) between adjacent segments, it
+      // means we don't really have accurate segment timing and have to reinit
+      // pts/dts offsets
+      if (reinit) {
+        this.accurate = false;
+        this.remuxer.insertDiscontinuity();
+      }
+      let startDTS = Math.max(this.remuxer._PTSNormalize(
+        (this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS)-
+        initDTS,this.nextAvcDts),0);
       let sample = samples[samples.length-1];
-      let videoStartDTS = Math.max(this.remuxer._PTSNormalize((this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts) - initDTS, this.nextAvcDts),0)/timescale;
-      let videoEndDTS = Math.max(this.remuxer._PTSNormalize(sample.dts - initDTS,this.nextAvcDts),0)/timescale;
+      let videoStartDTS = Math.max(this.remuxer._PTSNormalize(
+        (this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts)-
+        initDTS, this.nextAvcDts),0)/timescale;
+      let videoEndDTS = Math.max(this.remuxer._PTSNormalize(sample.dts-initDTS,
+        this.nextAvcDts),0)/timescale;
       if (this.accurate && Math.abs(startDTS-this.nextAvcDts)>90) {
         videoStartDTS -= (startDTS-this.nextAvcDts)/timescale;
       }
-      if ((samples.length+this.remuxAVCCount)>this.fragStartAVCPos+1 && this.fragStartDts !== undefined) {
-        var fragStartDts = this.remuxer._PTSNormalize(this.fragStartDts, this.nextAvcDts);
-        var sampleDts = this.remuxer._PTSNormalize(sample.dts, this.nextAvcDts);
-        videoEndDTS += (sampleDts - fragStartDts) / (samples.length + this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
+      if ((samples.length+this.remuxAVCCount)>this.fragStartAVCPos+1 &&
+        this.fragStartDts !== undefined) {
+        var fragStartDts = this.remuxer._PTSNormalize(this.fragStartDts,
+          this.nextAvcDts);
+        var sampleDts = this.remuxer._PTSNormalize(sample.dts,
+          this.nextAvcDts);
+        videoEndDTS += (sampleDts - fragStartDts) / (samples.length+
+          this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
       }
       segStartDTS = videoStartDTS;
       segEndDTS = videoEndDTS;
       if (this._aacTrack.audiosamplerate) {
         let expectedSampleDuration = 1024/this._aacTrack.audiosamplerate;
         let remuxAACCount = this._aacTrack.samples.length;
-        let nextAacPTS = (this.lastContiguous !== undefined && this.lastContiguous || this.contiguous && this.remuxAACCount) && this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale : (this.accurate ? this.timeOffset : segStartDTS);
-        segStartDTS = Math.max(segStartDTS, nextAacPTS+(this.fragStartAACPos-this.remuxAACCount)*expectedSampleDuration);
+        let nextAacPTS = (this.lastContiguous !== undefined &&
+          this.lastContiguous || this.contiguous && this.remuxAACCount) &&
+          this.remuxer.nextAacPts ? this.remuxer.nextAacPts/timescale :
+            (this.accurate ? this.timeOffset : segStartDTS);
+        segStartDTS = Math.max(segStartDTS, nextAacPTS+(this.fragStartAACPos-
+          this.remuxAACCount)*expectedSampleDuration);
         if (remuxAACCount) {
-          segEndDTS = Math.min(segEndDTS, nextAacPTS+expectedSampleDuration*remuxAACCount);
+          segEndDTS = Math.min(segEndDTS, nextAacPTS+
+            expectedSampleDuration*remuxAACCount);
         }
         let AVUnsync;
         if ((AVUnsync = segEndDTS-segStartDTS+videoStartDTS-videoEndDTS)>0.2) {
@@ -409,7 +436,7 @@
       // save samples and break by GOP
       for (maxk=samples.length-1; maxk>0; maxk--) {
         if (samples[maxk].key) {
-          if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < segStartDTS) {
+          if (maxk && (samples[maxk-1].dts-initDTS)/timescale < segStartDTS) {
             maxk = 0;
           }
           break;
@@ -425,11 +452,17 @@
         this._filterSamples(this._txtTrack, gopEndDTS, _saveTextSamples);
       }
     }
-    if ((flush || final && !this.remuxAVCCount) && this._avcTrack.samples.length+this._aacTrack.samples.length || maxk>0) {
+    if ((flush || final && !this.remuxAVCCount) &&
+      this._avcTrack.samples.length+this._aacTrack.samples.length || maxk>0)
+    {
       this.remuxAVCCount += this._avcTrack.samples.length;
       this.remuxAACCount += this._aacTrack.samples.length;
-      this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset,
-        flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats, flush && !lastSegment);
+      this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track,
+        this._txtTrack, flush && this.nextStartPts ?
+          this.nextStartPts : this.timeOffset,
+        flush && !lastSegment || (this.lastContiguous !== undefined ?
+          this.lastContiguous : this.contiguous), this.accurate, data, flush,
+        this.fragStats, flush && !lastSegment);
       this.lastContiguous = undefined;
       this.nextStartPts = this.remuxer.endPTS;
       this._avcTrack.samples = _saveAVCSamples;
@@ -443,8 +476,10 @@
     }
     //notify end of parsing
     if (final) {
-      let lastGopPTS = Math.min(this.remuxer.nextAvcDts, this.remuxer.nextAacPts)/timescale;
-      this.observer.trigger(Event.FRAG_PARSED, {startPTS: segStartDTS, endPTS: segEndDTS, lastGopPTS: lastGopPTS});
+      let lastGopPTS = Math.min(this.remuxer.nextAvcDts,
+        this.remuxer.nextAacPts)/timescale;
+      this.observer.trigger(Event.FRAG_PARSED, {startPTS: segStartDTS,
+        endPTS: segEndDTS, lastGopPTS: lastGopPTS});
     }
   }
 

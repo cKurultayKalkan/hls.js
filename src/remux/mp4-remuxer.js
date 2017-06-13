@@ -20,6 +20,7 @@ class MP4Remuxer {
     this.PES2MP4SCALEFACTOR = 4;
     this.PES_TIMESCALE = 90000;
     this.MP4_TIMESCALE = this.PES_TIMESCALE / this.PES2MP4SCALEFACTOR;
+    this.isSafari = browser.isSafari();
   }
 
   get passthrough() {
@@ -33,11 +34,8 @@ class MP4Remuxer {
     this._initPTS = this._initDTS = undefined;
   }
 
-  switchLevel(smooth) {
+  switchLevel() {
     this.ISGenerated = false;
-    if (!smooth) {
-      this.nextAacPts = this.nextAvcDts = undefined;
-    }
   }
 
   remux(audioTrack,videoTrack,id3Track,textTrack,timeOffset, contiguous, accurate, data, flush, stats, isPartial) {
@@ -107,12 +105,7 @@ class MP4Remuxer {
       // in order to avoid overflowing the 32 bit counter for large duration, we use smaller timescale (timescale/gcd)
       // we just need to ensure that AAC sample duration will still be an integer (will be 1024/gcd)
       if (audioTrack.timescale * audioTrack.duration > Math.pow(2, 32)) {
-        let greatestCommonDivisor = function(a, b) {
-            if ( ! b) {
-                return a;
-            }
-            return greatestCommonDivisor(b, a % b);
-        };
+        let greatestCommonDivisor = (a, b)=>(b ? greatestCommonDivisor(b, a%b) : a);
         audioTrack.timescale = audioTrack.audiosamplerate / greatestCommonDivisor(audioTrack.audiosamplerate,(audioTrack.isAAC ? 1024 : 1152));
       }
       logger.log ('audio mp4 timescale :'+ audioTrack.timescale);
@@ -171,7 +164,6 @@ class MP4Remuxer {
 
   remuxVideo(track, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush, stats, isPartial) {
     var offset = 8,
-        pesTimeScale = this.PES_TIMESCALE,
         pes2mp4ScaleFactor = this.PES2MP4SCALEFACTOR,
         mp4SampleDuration,
         mdat, moof,
@@ -179,7 +171,39 @@ class MP4Remuxer {
         nextDTS,
         lastPTS, lastDTS,
         inputSamples = track.samples,
-        outputSamples = [];
+        outputSamples = [],
+        ptsNormalize = this._PTSNormalize,
+        initDTS = this._initDTS;
+
+    let timeScale = this.PES_TIMESCALE;
+
+    // if parsed fragment is contiguous with last one, let's use last DTS value as reference
+    let nextAvcDts = this.nextAvcDts;
+    const isSafari = this.isSafari;
+
+    // if parsed fragment is contiguous with last one, let's use last DTS value as reference
+    contiguous |= (inputSamples.length && this.nextAvcDts && accurate &&
+        (Math.abs(timeOffset-nextAvcDts/timeScale) < 0.1 ||
+          Math.abs((inputSamples[0].dts-nextAvcDts-initDTS)) < timeScale/5));
+
+    if (!contiguous) {
+      // if not contiguous, let's use target timeOffset
+      nextAvcDts = timeOffset*timeScale;
+    }
+
+    // PTS is coded on 33bits, and can loop from -2^32 to 2^32
+    // PTSNormalize will make PTS/DTS value monotonic, we use last known DTS value as reference value
+    inputSamples.forEach(function(sample) {
+      sample.pts = ptsNormalize(sample.pts-initDTS, nextAvcDts);
+      sample.dts = ptsNormalize(sample.dts-initDTS, nextAvcDts);
+    });
+
+    // sort video samples by DTS then PTS then demux id order
+    inputSamples.sort(function(a, b) {
+      const deltadts = a.dts - b.dts;
+      const deltapts = a.pts - b.pts;
+      return deltadts ? deltadts : deltapts ? deltapts : (a.id - b.id);
+    });
 
     // handle broken streams with PTS < DTS, tolerance up 200ms (18000 in 90kHz timescale)
     let PTSDTSshift = inputSamples.reduce( (prev, curr) => Math.max(Math.min(prev,curr.pts-curr.dts),-18000),0);
@@ -190,28 +214,22 @@ class MP4Remuxer {
       }
     }
 
-    contiguous |= (inputSamples.length && this.nextAvcDts && accurate && Math.abs(timeOffset-this.nextAvcDts/pesTimeScale) < 0.1);
 
-    // PTS is coded on 33bits, and can loop from -2^32 to 2^32
-    // PTSNormalize will make PTS/DTS value monotonic, we use last known DTS value as reference value
-    // if parsed fragment is contiguous with last one, let's use last DTS value as reference
-    // if not contiguous, let's use target timeOffset
-    let nextAvcDts = contiguous ? this.nextAvcDts : timeOffset*pesTimeScale;
     // compute first DTS and last DTS, normalize them against reference value
     let sample = inputSamples[0];
-    firstDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts),0);
-    firstPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts),0);
+    firstDTS = Math.max(sample.dts, 0);
+    firstPTS = Math.max(sample.pts, 0);
 
     // check timestamp continuity (to remove inter-fragment gap/hole)
-    let delta = Math.round((firstDTS - nextAvcDts) / 90);
+    let delta = Math.round((firstDTS - nextAvcDts)*1000 / timeScale);
     if (contiguous && delta) {
       logger.log(`AVC:${Math.abs(delta)} ms ${delta>0 ? 'hole' : 'overlapping'} between fragments detected`);
       // remove hole/gap : set DTS to next expected DTS
       firstDTS = nextAvcDts;
-      inputSamples[0].dts = firstDTS + this._initDTS;
+      inputSamples[0].dts = firstDTS;
       // offset PTS as well, ensure that PTS is smaller or equal than new DTS
-      firstPTS = Math.max(firstPTS - delta*90, nextAvcDts);
-      inputSamples[0].pts = firstPTS + this._initDTS;
+      firstPTS = Math.max(firstPTS - delta*timeScale/1000, nextAvcDts);
+      inputSamples[0].pts = firstPTS;
       logger.log(`Video/PTS/DTS adjusted: ${firstPTS}/${firstDTS},delta:${delta}`);
       stats.videoGap = stats.videoGap||[];
       stats.videoGap.push(delta);
@@ -227,36 +245,30 @@ class MP4Remuxer {
 
     // compute lastPTS/lastDTS
     sample = inputSamples[inputSamples.length-1];
-    lastDTS = Math.max(this._PTSNormalize(sample.dts - this._initDTS,nextAvcDts) ,0);
-    lastPTS = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts) ,0);
-    lastPTS = Math.max(lastPTS, lastDTS);
+    lastDTS = Math.max(sample.dts, 0);
+    lastPTS = Math.max(sample.pts, 0, lastDTS);
 
     // on Safari let's signal the same sample duration for all samples
     // sample duration (as expected by trun MP4 boxes), should be the delta between sample DTS
     // set this constant duration as being the avg delta between consecutive DTS.
-    if (browser.isSafari()) {
+    if (isSafari) {
       mp4SampleDuration = inputSamples.length>1 ? Math.round((lastDTS-firstDTS)/(pes2mp4ScaleFactor*(inputSamples.length-1))) : 0;
     }
 
     // normalize all PTS/DTS now ...
     for (let i = 0; i < inputSamples.length; i++) {
       let sample = inputSamples[i];
-      if (browser.isSafari()) {
+      if (isSafari) {
         // sample DTS is computed using a constant decoding offset (mp4SampleDuration) between samples
         sample.dts = firstDTS + i*pes2mp4ScaleFactor*mp4SampleDuration;
       } else {
         // ensure sample monotonic DTS
-        sample.dts = Math.max(this._PTSNormalize(sample.dts - this._initDTS, nextAvcDts),firstDTS);
-        // ensure dts is a multiple of scale factor to avoid rounding issues
-        sample.dts = Math.round(sample.dts/pes2mp4ScaleFactor)*pes2mp4ScaleFactor;
+        sample.dts = Math.max(sample.dts, firstDTS)&0xFFFFFFFC;
       }
-      // we normalize PTS against nextAvcDts, we also substract initDTS (some streams don't start @ PTS O)
-      // and we ensure that computed value is greater or equal than sample DTS
-      sample.pts = Math.max(this._PTSNormalize(sample.pts - this._initDTS,nextAvcDts) , sample.dts);
-      // ensure pts is a multiple of scale factor to avoid rounding issues
-      sample.pts = Math.round(sample.pts/pes2mp4ScaleFactor)*pes2mp4ScaleFactor;
+      // ensure that computed value is greater or equal than sample DTS
+      sample.pts = Math.max(sample.pts, sample.dts)&0xFFFFFFFC;
     }
-    this.lastSamples = browser.isSafari() && flush && inputSamples.length > 1 ?
+    this.lastSamples = isSafari && flush && inputSamples.length > 1 ?
       inputSamples.slice(-2) : undefined;
 
     /* concatenate the video data and construct the mdat in place
@@ -283,7 +295,7 @@ class MP4Remuxer {
         mp4SampleLength += 4 + unit.data.byteLength;
       }
 
-      if(!browser.isSafari()) {
+      if(!isSafari) {
         // expected sample duration is the Decoding Timestamp diff of consecutive samples
         if (i < inputSamples.length - 1) {
           mp4SampleDuration = inputSamples[i+1].dts - avcSample.dts;
@@ -298,8 +310,8 @@ class MP4Remuxer {
             // the duration of the last frame to minimize any potential gap between segments.
             let maxBufferHole = config.maxBufferHole,
                 maxSeekHole = config.maxSeekHole,
-                gapTolerance = Math.floor(Math.min(maxBufferHole, maxSeekHole) * pesTimeScale),
-                deltaToFrameEnd = (audioTrackLength ? firstPTS + audioTrackLength * pesTimeScale : this.nextAacPts) - avcSample.pts;
+                gapTolerance = Math.floor(Math.min(maxBufferHole, maxSeekHole) * timeScale),
+                deltaToFrameEnd = (audioTrackLength ? firstPTS + audioTrackLength * timeScale : this.nextAacPts) - avcSample.pts;
             if (deltaToFrameEnd > gapTolerance) {
               // We subtract lastFrameDuration from deltaToFrameEnd to try to prevent any video
               // frame overlap. maxBufferHole/maxSeekHole should be >> lastFrameDuration anyway.
@@ -357,15 +369,15 @@ class MP4Remuxer {
       flags.isNonSync = 0;
     }
     track.samples = outputSamples;
-    moof = MP4.moof(track.sequenceNumber++, firstDTS / pes2mp4ScaleFactor, track);
+    moof = MP4.moof(track.sequenceNumber++, firstDTS/pes2mp4ScaleFactor, track);
     track.samples = [];
     let data = {
       data1: moof,
       data2: mdat,
-      startPTS: firstPTS / pesTimeScale,
-      endPTS: (lastPTS + pes2mp4ScaleFactor * mp4SampleDuration) / pesTimeScale,
-      startDTS: firstDTS / pesTimeScale,
-      endDTS: this.nextAvcDts / pesTimeScale,
+      startPTS: firstPTS / timeScale,
+      endPTS: (lastPTS + pes2mp4ScaleFactor * mp4SampleDuration) / timeScale,
+      startDTS: firstDTS / timeScale,
+      endDTS: this.nextAvcDts / timeScale,
       type: 'video',
       flush: flush,
       nb: outputSamples.length,
@@ -403,7 +415,8 @@ class MP4Remuxer {
     // this helps ensuring audio continuity
     // and this also avoids audio glitches/cut when switching quality, or reporting wrong duration on first audio frame
 
-    contiguous |= (samples0.length && this.nextAacPts && accurate && Math.abs(timeOffset-this.nextAacPts/pesTimeScale) < 0.1);
+    contiguous |= (samples0.length && this.nextAacPts && accurate &&
+      Math.abs(timeOffset-this.nextAacPts/pesTimeScale) < 0.1);
     let nextAacPts = (contiguous && this.nextAacPts !== undefined ? this.nextAacPts : timeOffset*pesTimeScale);
 
     // If the audio track is missing samples, the frames seem to get "left-shifted" within the
