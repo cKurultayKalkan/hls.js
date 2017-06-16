@@ -767,13 +767,13 @@ var BufferController = function (_EventHandler) {
         ms.removeEventListener('sourceended', this.onmse);
         ms.removeEventListener('sourceclose', this.onmsc);
 
-        try {
-          // unlink MediaSource from video tag
-          this.media.src = '';
+        // Detach properly the MediaSource from the HTMLMediaElement as
+        // suggested in https://github.com/w3c/media-source/issues/53.
+        if (this.media) {
           this.media.removeAttribute('src');
-        } catch (err) {
-          _logger.logger.warn('onMediaDetaching:' + err.message + ' while unlinking video.src');
+          this.media.load();
         }
+
         this.mediaSource = null;
         this.media = null;
         this.pendingTracks = null;
@@ -7545,7 +7545,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-165';
+      return '0.6.1-166';
     }
   }, {
     key: 'Events',
