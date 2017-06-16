@@ -388,6 +388,7 @@
       // pts/dts offsets
       if (reinit) {
         this.accurate = false;
+        this.remuxer.switchLevel();
         this.remuxer.insertDiscontinuity();
       }
       let startDTS = Math.max(this.remuxer._PTSNormalize(

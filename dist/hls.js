@@ -5893,6 +5893,7 @@ var TSDemuxer = function () {
         // pts/dts offsets
         if (reinit) {
           this.accurate = false;
+          this.remuxer.switchLevel();
           this.remuxer.insertDiscontinuity();
         }
         var startDTS = Math.max(this.remuxer._PTSNormalize((this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS) - initDTS, this.nextAvcDts), 0);
@@ -7545,7 +7546,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-166';
+      return '0.6.1-167';
     }
   }, {
     key: 'Events',
