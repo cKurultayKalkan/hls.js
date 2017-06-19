@@ -433,7 +433,7 @@
         }
       }
     }
-    if (!flush) {
+    if (!flush && !(this.config && this.config.disableBrakeByGop)) {
       // save samples and break by GOP
       for (maxk=samples.length-1; maxk>0; maxk--) {
         if (samples[maxk].key) {

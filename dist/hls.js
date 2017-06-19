@@ -5924,7 +5924,7 @@ var TSDemuxer = function () {
           }
         }
       }
-      if (!flush) {
+      if (!flush && !(this.config && this.config.disableBrakeByGop)) {
         // save samples and break by GOP
         for (maxk = samples.length - 1; maxk > 0; maxk--) {
           if (samples[maxk].key) {
@@ -7546,7 +7546,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-167';
+      return '0.6.1-168';
     }
   }, {
     key: 'Events',
