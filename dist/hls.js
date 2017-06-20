@@ -3389,6 +3389,9 @@ var StreamController = function (_EventHandler) {
                   }
                 }
               }
+            } else {
+              this.stalled = undefined;
+              this.nudgeRetry = 0;
             }
           }
         }
@@ -7546,7 +7549,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-168';
+      return '0.6.1-169';
     }
   }, {
     key: 'Events',

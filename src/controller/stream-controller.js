@@ -1371,6 +1371,9 @@ class StreamController extends EventHandler {
                 }
               }
             }
+          } else {
+            this.stalled = undefined;
+            this.nudgeRetry = 0;
           }
         }
       }
