@@ -7549,7 +7549,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-169';
+      return '0.6.1-170';
     }
   }, {
     key: 'Events',
@@ -8527,7 +8527,7 @@ var PlaylistLoader = function (_EventHandler) {
         level.fragments.pop();
         totalduration -= frag.duration;
       }
-      level.totalduration = totalduration;
+      level.totalduration = totalduration = Math.round(totalduration * 1000000) / 1000000;
       level.averagetargetduration = totalduration / level.fragments.length;
       level.endSN = currentSN - 1;
       this.hls.config.maxFragLookUpTolerance = Math.max(minDuration - 0.001, 0);

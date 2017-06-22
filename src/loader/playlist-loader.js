@@ -299,7 +299,7 @@ class PlaylistLoader extends EventHandler {
       level.fragments.pop();
       totalduration-=frag.duration;
     }
-    level.totalduration = totalduration;
+    level.totalduration = totalduration = Math.round(totalduration*1000000)/1000000;
     level.averagetargetduration = totalduration / level.fragments.length;
     level.endSN = currentSN - 1;
     this.hls.config.maxFragLookUpTolerance = Math.max(minDuration-0.001, 0);
