@@ -897,7 +897,7 @@ class StreamController extends EventHandler {
       }
     } else {
       newDetails.PTSKnown = false;
-      if (lastDetails) {
+      if (lastDetails && lastDetails.fragments.length === newDetails.fragments.length) {
         LevelHelper.mergeDetails(lastDetails, newDetails);
       }
     }
@@ -1400,12 +1400,14 @@ class StreamController extends EventHandler {
   }
 
   onLevelPtsUpdated(lu) {
-    if (!this.levels || this.levels[lu.level].details.live) {
+    let oldDetails = this.levels && this.levels[lu.level].details;
+    if (!oldDetails || oldDetails.live) {
       return;
     }
     for (var level=0; level<this.levels.length; level++) {
-      if (level !== lu.level && this.levels[level].details) {
-        LevelHelper.mergeDetails(this.levels[lu.level].details, this.levels[level].details);
+      let newDetails = this.levels[level].details;
+      if (level !== lu.level && newDetails && oldDetails.fragments.length === newDetails.fragments.length) {
+        LevelHelper.mergeDetails(oldDetails, newDetails);
       }
     }
   }

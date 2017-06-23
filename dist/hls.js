@@ -2896,7 +2896,7 @@ var StreamController = function (_EventHandler) {
         }
       } else {
         newDetails.PTSKnown = false;
-        if (lastDetails) {
+        if (lastDetails && lastDetails.fragments.length === newDetails.fragments.length) {
           _levelHelper2.default.mergeDetails(lastDetails, newDetails);
         }
       }
@@ -3425,12 +3425,14 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'onLevelPtsUpdated',
     value: function onLevelPtsUpdated(lu) {
-      if (!this.levels || this.levels[lu.level].details.live) {
+      var oldDetails = this.levels && this.levels[lu.level].details;
+      if (!oldDetails || oldDetails.live) {
         return;
       }
       for (var level = 0; level < this.levels.length; level++) {
-        if (level !== lu.level && this.levels[level].details) {
-          _levelHelper2.default.mergeDetails(this.levels[lu.level].details, this.levels[level].details);
+        var newDetails = this.levels[level].details;
+        if (level !== lu.level && newDetails && oldDetails.fragments.length === newDetails.fragments.length) {
+          _levelHelper2.default.mergeDetails(oldDetails, newDetails);
         }
       }
     }
@@ -7549,7 +7551,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-172';
+      return '0.6.1-173';
     }
   }, {
     key: 'Events',
