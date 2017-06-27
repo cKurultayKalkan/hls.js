@@ -2543,6 +2543,7 @@ var StreamController = function (_EventHandler) {
         if (!this.demuxer) {
           this.demuxer = new _demuxer2.default(hls, 'main');
         }
+        this.stats = { tfirst: performance.now() };
         this.state = State.FRAG_LOADING;
         hls.trigger(_events2.default.FRAG_LOADING, { frag: frag });
         return true;
@@ -2949,6 +2950,9 @@ var StreamController = function (_EventHandler) {
       var fragCurrent = this.fragCurrent;
       if ((this.state === State.FRAG_LOADING || this.state === State.PARSING) && fragCurrent && data.frag.level === fragCurrent.level && data.frag.sn === fragCurrent.sn) {
         _logger.logger.log('Loaded chunk ' + data.payload.byteLength + ' of frag ' + fragCurrent.sn + ' of level ' + fragCurrent.level);
+        if (this.state === State.PARSING && fragCurrent.loaded) {
+          _logger.logger.log('Same chunk loaded in PARSING state');
+        }
         if (data.payload.keymaps) {
           var keymaps = data.payload.keymaps;
           this.savedKeymaps = Object.assign(this.savedKeymaps || {}, keymaps);
@@ -2971,6 +2975,9 @@ var StreamController = function (_EventHandler) {
         }
         this.state = State.PARSING;
         // transmux the MPEG-TS data to ISO-BMFF segments
+        if (!data.stats.tfirst && this.stats && this.stats.tfirst) {
+          data.stats.tfirst = this.stats.tfirst;
+        }
         this.stats = data.stats;
         var level = fragCurrent.level,
             fragLevel = this.levels[level],
@@ -3011,6 +3018,9 @@ var StreamController = function (_EventHandler) {
     value: function onFragLoaded() {
       _logger.logger.log('Loaded ' + this.fragCurrent.sn + ' of level ' + this.fragCurrent.level);
       this.fragLoadError = 0;
+      if (this.stats.tload === undefined) {
+        this.stats.tload = performance.now();
+      }
     }
   }, {
     key: 'onFragParsingInitSegment',
@@ -7551,7 +7561,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-173';
+      return '0.6.1-174';
     }
   }, {
     key: 'Events',

@@ -524,6 +524,7 @@ class StreamController extends EventHandler {
       if (!this.demuxer) {
         this.demuxer = new Demuxer(hls,'main');
       }
+      this.stats = {tfirst: performance.now()};
       this.state = State.FRAG_LOADING;
       hls.trigger(Event.FRAG_LOADING, {frag: frag});
       return true;
@@ -949,6 +950,9 @@ class StreamController extends EventHandler {
         fragCurrent && data.frag.level === fragCurrent.level &&
         data.frag.sn === fragCurrent.sn) {
       logger.log(`Loaded chunk ${data.payload.byteLength} of frag ${fragCurrent.sn} of level ${fragCurrent.level}`);
+      if (this.state === State.PARSING && fragCurrent.loaded) {
+        logger.log('Same chunk loaded in PARSING state');
+      }
       if (data.payload.keymaps) {
           var keymaps = data.payload.keymaps;
           this.savedKeymaps = Object.assign(this.savedKeymaps||{}, keymaps);
@@ -971,6 +975,9 @@ class StreamController extends EventHandler {
       }
       this.state = State.PARSING;
       // transmux the MPEG-TS data to ISO-BMFF segments
+      if (!data.stats.tfirst && this.stats && this.stats.tfirst) {
+        data.stats.tfirst = this.stats.tfirst;
+      }
       this.stats = data.stats;
       var level = fragCurrent.level,
           fragLevel = this.levels[level],
@@ -1010,6 +1017,9 @@ class StreamController extends EventHandler {
   onFragLoaded() {
     logger.log(`Loaded ${this.fragCurrent.sn} of level ${this.fragCurrent.level}`);
     this.fragLoadError = 0;
+    if (this.stats.tload === undefined) {
+      this.stats.tload = performance.now();
+    }
   }
 
   onFragParsingInitSegment(data) {
