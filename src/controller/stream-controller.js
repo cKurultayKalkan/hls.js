@@ -1011,6 +1011,8 @@ class StreamController extends EventHandler {
       if (data.payload.final) {
         fragCurrent.loaded = true;
       }
+    } else {
+      logger.warn(`not in FRAG_LOADING state but ${this.state}, ignoring FRAG_CHUNK_LOADED event for ${data.frag.sn}`);
     }
   }
 
