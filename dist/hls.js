@@ -6956,7 +6956,7 @@ var EventHandler = function () {
       try {
         eventToFunction.call(this, event, data).call();
       } catch (err) {
-        _logger.logger.error('internal error happened while processing ' + event + ':' + err.message);
+        _logger.logger.error('internal error happened while processing ' + event + ':' + err.stack);
         this.hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.OTHER_ERROR, details: _errors.ErrorDetails.INTERNAL_EXCEPTION, fatal: false, event: event, err: err });
       }
     }
@@ -7562,7 +7562,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-175';
+      return '0.6.1-176';
     }
   }, {
     key: 'Events',
