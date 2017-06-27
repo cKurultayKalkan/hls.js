@@ -1148,11 +1148,12 @@ class StreamController extends EventHandler {
         frag.dropped = 1;
         frag.deltaPTS = this.config.maxSeekHole+1;
       }
-      const sameLevel = fragPrevious && frag.level === fragPrevious.level;
-      if (!this.config.disableBacktrack && !details.live && !data.isPartial && !sameLevel) {
-        const curSNIdx = frag.sn - details.startSN;
+      const curSNIdx = frag.sn - details.startSN;
+      if (curSNIdx) {
         let detFrag = details.fragments[curSNIdx];
-        if (curSNIdx) {
+        detFrag.loadCounter = frag.loadCounter;
+        const sameLevel = fragPrevious && frag.level === fragPrevious.level;
+        if (!this.config.disableBacktrack && !details.live && !data.isPartial && !sameLevel) {
           if (frag.dropped) {
             detFrag.dropped = frag.dropped;
             if (!detFrag.backtracked) {
