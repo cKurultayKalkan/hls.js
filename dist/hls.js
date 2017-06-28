@@ -5944,7 +5944,7 @@ var TSDemuxer = function () {
       }
       if (!flush && !(this.config && this.config.disableBrakeByGop)) {
         // save samples and break by GOP
-        for (maxk = samples.length - 1; maxk > 0; maxk--) {
+        for (maxk = samples.length - 1; maxk > 1; maxk--) {
           if (samples[maxk].key) {
             if (maxk && (samples[maxk - 1].dts - initDTS) / timescale < segStartDTS) {
               maxk = 0;
@@ -5952,7 +5952,7 @@ var TSDemuxer = function () {
             break;
           }
         }
-        if (maxk > 0) {
+        if (maxk > 1) {
           _saveAVCSamples = samples.slice(maxk);
           this._avcTrack.samples = samples.slice(0, maxk);
           gopEndDTS = this._avcTrack.samples[maxk - 1].dts;
@@ -7564,7 +7564,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-177';
+      return '0.6.1-178';
     }
   }, {
     key: 'Events',

@@ -435,7 +435,7 @@
     }
     if (!flush && !(this.config && this.config.disableBrakeByGop)) {
       // save samples and break by GOP
-      for (maxk=samples.length-1; maxk>0; maxk--) {
+      for (maxk=samples.length-1; maxk>1; maxk--) {
         if (samples[maxk].key) {
           if (maxk && (samples[maxk-1].dts-initDTS)/timescale < segStartDTS) {
             maxk = 0;
@@ -443,7 +443,7 @@
           break;
         }
       }
-      if (maxk>0) {
+      if (maxk>1) {
         _saveAVCSamples = samples.slice(maxk);
         this._avcTrack.samples = samples.slice(0, maxk);
         gopEndDTS = this._avcTrack.samples[maxk-1].dts;
