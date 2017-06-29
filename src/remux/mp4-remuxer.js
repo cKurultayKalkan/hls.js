@@ -392,10 +392,10 @@ class MP4Remuxer {
 
   remuxAudio(track, timeOffset, contiguous, accurate, stats, isPartial) {
     let pesTimeScale = this.PES_TIMESCALE,
-        mp4timeScale = track.timescale,
+        mp4timeScale = track.timescale ? track.timescale : track.audiosamplerate,
         pes2mp4ScaleFactor = pesTimeScale/mp4timeScale,
         mp4SampleDuration = track.isAAC ? 1024 : 1152,
-        expectedSampleDuration = track.timescale * mp4SampleDuration/ track.audiosamplerate,
+        expectedSampleDuration = mp4timeScale * mp4SampleDuration/ track.audiosamplerate,
         rawMPEG = !track.isAAC && this.typeSupported.mpeg;
     var view,
         offset = rawMPEG ? 0 : 8,
