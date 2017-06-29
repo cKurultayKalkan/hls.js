@@ -2438,7 +2438,7 @@ var StreamController = function (_EventHandler) {
         var prevFrag = fragments[curSNIdx - 1];
         var nextFrag = fragments[curSNIdx + 1];
         _logger.logger.log('find SN matching with pos:' + bufferEnd + ':' + frag.sn);
-        if (!frag.backtracked && fragPrevious && frag.sn === fragPrevious.sn) {
+        if ((!frag.backtracked || frag.backtracked && !frag.dropped && !nextFrag) && fragPrevious && frag.sn === fragPrevious.sn) {
           if (frag.sn < levelDetails.endSN) {
             var deltaPTS = fragPrevious.deltaPTS;
             // if there is a significant delta between audio and video, larger than max allowed hole,
@@ -7564,7 +7564,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-179';
+      return '0.6.1-180';
     }
   }, {
     key: 'Events',
