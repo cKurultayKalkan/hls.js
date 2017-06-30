@@ -5882,9 +5882,12 @@ var TSDemuxer = function () {
         var sampleTime = sample.dts || sample.pts;
         if (sampleTime <= end) {
           _new.push(sample);
-        } else {
+        } else if (_save) {
           _save.push(sample);
         }
+      }
+      if (!_save) {
+        return _new;
       }
       track.samples = _new;
       this._recalcTrack(track);
@@ -5900,7 +5903,6 @@ var TSDemuxer = function () {
           samples = this._avcTrack.samples,
           segStartDTS,
           segEndDTS,
-          gopEndDTS,
           initDTS,
           reinit;
       var timescale = this.remuxer.PES_TIMESCALE;
@@ -5954,13 +5956,15 @@ var TSDemuxer = function () {
           }
         }
         if (maxk > 1) {
-          _saveAVCSamples = samples.slice(maxk);
-          this._avcTrack.samples = samples.slice(0, maxk);
-          gopEndDTS = this._avcTrack.samples[maxk - 1].dts;
-          this._recalcTrack(this._avcTrack);
-          this._filterSamples(this._aacTrack, gopEndDTS, _saveAACSamples);
-          this._filterSamples(this._id3Track, gopEndDTS, _saveID3Samples);
-          this._filterSamples(this._txtTrack, gopEndDTS, _saveTextSamples);
+          var gopEndDTS = this._avcTrack.samples[maxk - 1].dts;
+          if (this.remuxer.ISGenerated || !this.remuxer.ISGenerated && this._aacTrack.samples.length && this._filterSamples(this._aacTrack, gopEndDTS).length) {
+            _saveAVCSamples = samples.slice(maxk);
+            this._avcTrack.samples = samples.slice(0, maxk);
+            this._recalcTrack(this._avcTrack);
+            this._filterSamples(this._aacTrack, gopEndDTS, _saveAACSamples);
+            this._filterSamples(this._id3Track, gopEndDTS, _saveID3Samples);
+            this._filterSamples(this._txtTrack, gopEndDTS, _saveTextSamples);
+          }
         }
       }
       if ((flush || final && !this.remuxAVCCount) && this._avcTrack.samples.length + this._aacTrack.samples.length || maxk > 0) {
@@ -7565,7 +7569,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-181';
+      return '0.6.1-182';
     }
   }, {
     key: 'Events',
