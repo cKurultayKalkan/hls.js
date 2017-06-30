@@ -426,7 +426,8 @@ class StreamController extends EventHandler {
       const prevFrag = fragments[curSNIdx - 1];
       const nextFrag = fragments[curSNIdx + 1];
       logger.log('find SN matching with pos:' +  bufferEnd + ':' + frag.sn);
-      if ((!frag.backtracked || frag.backtracked && !frag.dropped && !nextFrag) && fragPrevious && frag.sn === fragPrevious.sn) {
+      let ignoreBacktrack = !frag.backtracked || frag.backtracked && !frag.dropped && !nextFrag || frag.backtracked && frag.lastGop && bufferEnd >= frag.lastGop;
+      if (ignoreBacktrack && fragPrevious && frag.sn === fragPrevious.sn) {
         if (frag.sn < levelDetails.endSN) {
           let deltaPTS = fragPrevious.deltaPTS;
           // if there is a significant delta between audio and video, larger than max allowed hole,
