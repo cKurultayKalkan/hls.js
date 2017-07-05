@@ -6186,6 +6186,7 @@ var TSDemuxer = function () {
           units2 = [],
           debug = false,
           key = false,
+          spsfound = false,
           length = 0,
           expGolombDecoder,
           avcSample,
@@ -6261,9 +6262,10 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'NDR ';
             }
-            // retrieve slice type by parsing beginning of NAL unit (follow H264 spec, slice_header definition) to detect keyframe embedded in NDR
             var data = unit.data;
-            if (data.length > 4) {
+            // only check slice type to detect KF in case SPS found in same packet (any keyframe is preceded by SPS ...)
+            if (spsfound && data.length > 4) {
+              // retrieve slice type by parsing beginning of NAL unit (follow H264 spec, slice_header definition) to detect keyframe embedded in NDR
               var sliceType = new _expGolomb2.default(data).readSliceType();
               // 2 : I slice, 4 : SI slice, 7 : I slice, 9: SI slice
               // SI slice : A slice that is coded using intra prediction only and using quantisation of the prediction samples.
@@ -6367,6 +6369,7 @@ var TSDemuxer = function () {
           //SPS
           case 7:
             push = true;
+            spsfound = true;
             if (debug) {
               debugString += 'SPS ';
             }
@@ -7569,7 +7572,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-182';
+      return '0.6.1-183';
     }
   }, {
     key: 'Events',
