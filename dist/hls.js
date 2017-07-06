@@ -3374,7 +3374,7 @@ var StreamController = function (_EventHandler) {
                     hls.trigger(_events2.default.BUF_STATISTICS, { bufSeekOverHole: { ts: currentTime } });
                   }
                 } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
-                  if (this.stallReported && this.stallLowBuf || !this.stallLowBuf && media.seeking) {
+                  if (this.stallReported && this.stallLowBuf) {
                     // reset stalled so to rearm watchdog timer
                     this.stalled = undefined;
                   } else {
@@ -7572,7 +7572,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-183';
+      return '0.6.1-184';
     }
   }, {
     key: 'Events',
