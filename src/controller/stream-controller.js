@@ -1164,7 +1164,7 @@ class StreamController extends EventHandler {
         let detFrag = details.fragments[curSNIdx];
         detFrag.loadCounter = frag.loadCounter;
         const sameLevel = fragPrevious && frag.level === fragPrevious.level;
-        if (!this.config.disableBacktrack && !details.live && !data.isPartial && !sameLevel) {
+        if (!this.config.disableBacktrack && !data.isPartial && !sameLevel) {
           if (frag.dropped) {
             detFrag.dropped = frag.dropped;
             if (!detFrag.backtracked) {
