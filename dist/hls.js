@@ -2053,6 +2053,7 @@ var StreamController = function (_EventHandler) {
       if (this.levels) {
         var media = this.media,
             lastCurrentTime = this.lastCurrentTime;
+        var lastLevel = this.level;
         this.stopLoad();
         if (!this.demuxer) {
           this.demuxer = new _demuxer2.default(this.hls);
@@ -2068,9 +2069,9 @@ var StreamController = function (_EventHandler) {
         this.level = -1;
         this.fragLoadError = 0;
         if (media && lastCurrentTime > 0) {
-          var lastLevel = this.hls.loadLevel;
-          if (_levelHelper2.default.isLive(lastLevel, this.levels)) {
-            this.level = lastLevel;
+          var _lastLevel = this.hls.loadLevel;
+          if (_levelHelper2.default.isLive(_lastLevel, this.levels)) {
+            this.level = _lastLevel;
             this.waitLiveLevel = true;
           }
           _logger.logger.log('configure startPosition @' + lastCurrentTime);
@@ -2078,7 +2079,14 @@ var StreamController = function (_EventHandler) {
         } else {
           this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
           _logger.logger.log('configure lastCurrentTime @' + this.lastCurrentTime + ' start:' + this.startPosition + ',' + startPosition);
-          this.state = State.STARTING;
+          var level = lastLevel !== -1 && lastLevel === this.hls.startLevel && this.levels[lastLevel];
+          // check if playlist is already loaded
+          if (level && level.details && !level.details.live) {
+            this.state = State.IDLE;
+            this.level = lastLevel;
+          } else {
+            this.state = State.STARTING;
+          }
         }
         this.nextLoadPosition = this.startPosition = this.lastCurrentTime;
         this.tick();
@@ -7572,7 +7580,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-184';
+      return '0.6.1-185';
     }
   }, {
     key: 'Events',

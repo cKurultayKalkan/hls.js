@@ -70,7 +70,8 @@ class StreamController extends EventHandler {
 
   startLoad(startPosition=0) {
     if (this.levels) {
-      var media = this.media, lastCurrentTime = this.lastCurrentTime;
+      let media = this.media, lastCurrentTime = this.lastCurrentTime;
+      let lastLevel = this.level;
       this.stopLoad();
       if (!this.demuxer) {
         this.demuxer = new Demuxer(this.hls);
@@ -96,7 +97,14 @@ class StreamController extends EventHandler {
       } else {
         this.lastCurrentTime = this.startPosition ? this.startPosition : startPosition;
         logger.log(`configure lastCurrentTime @${this.lastCurrentTime} start:${this.startPosition},${startPosition}`);
-        this.state = State.STARTING;
+        let level = lastLevel!==-1 && lastLevel===this.hls.startLevel && this.levels[lastLevel];
+        // check if playlist is already loaded
+        if (level && level.details && !level.details.live) {
+          this.state = State.IDLE;
+          this.level = lastLevel;
+        } else {
+          this.state = State.STARTING;
+        }
       }
       this.nextLoadPosition = this.startPosition = this.lastCurrentTime;
       this.tick();
