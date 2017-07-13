@@ -1232,7 +1232,7 @@ var BufferController = function (_EventHandler) {
               bufStart = sb.buffered.start(i);
               bufEnd = sb.buffered.end(i);
               // workaround firefox not able to properly flush multiple buffered range.
-              if (navigator.userAgent.toLowerCase().indexOf('firefox') !== -1 && endOffset === Number.POSITIVE_INFINITY) {
+              if (this.hls.config.browser.isFirefox && endOffset === Number.POSITIVE_INFINITY) {
                 flushStart = startOffset;
                 flushEnd = endOffset;
               } else {
@@ -1641,7 +1641,8 @@ var LevelController = function (_EventHandler) {
           bitrateSet = {},
           videoCodecFound = false,
           audioCodecFound = false,
-          brokenmp4inmp3 = /chrome|firefox/.test(navigator.userAgent.toLowerCase()),
+          browser = this.hls.config.browser,
+          brokenmp4inmp3 = browser.isChrome || browser.isFirefox,
           checkSupported = function checkSupported(type, codec) {
         return MediaSource.isTypeSupported(type + '/mp4;codecs=' + codec);
       };
@@ -1987,10 +1988,6 @@ var _levelHelper = _dereq_('../helper/level-helper');
 var _levelHelper2 = _interopRequireDefault(_levelHelper);
 
 var _errors = _dereq_('../errors');
-
-var _browser = _dereq_('../utils/browser');
-
-var _browser2 = _interopRequireDefault(_browser);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -3045,7 +3042,7 @@ var StreamController = function (_EventHandler) {
         track = tracks.audio;
         if (track) {
           var audioCodec = this.levels[this.level].audioCodec,
-              ua = navigator.userAgent.toLowerCase();
+              browser = this.config.browser;
           if (audioCodec && this.audioCodecSwap) {
             _logger.logger.log('swapping playlist audio codec');
             if (audioCodec.indexOf('mp4a.40.5') !== -1) {
@@ -3062,12 +3059,12 @@ var StreamController = function (_EventHandler) {
             // don't force HE-AAC if mono stream
             if (track.metadata.channelCount !== 1 &&
             // don't force HE-AAC if firefox
-            ua.indexOf('firefox') === -1) {
+            !browser.isFirefox) {
               audioCodec = 'mp4a.40.5';
             }
           }
           // HE-AAC is broken on Android, always signal audio codec as AAC even if variant manifest states otherwise
-          if (ua.indexOf('android') !== -1 && track.container !== 'audio/mpeg') {
+          if (browser.isAndroid && track.container !== 'audio/mpeg') {
             audioCodec = 'mp4a.40.2';
             _logger.logger.log('Android: force audio codec to ' + audioCodec);
           }
@@ -3310,7 +3307,7 @@ var StreamController = function (_EventHandler) {
                 i = 0;
                 startPosition = media.buffered.start(i);
               }
-              if (_browser2.default.isSafari()) {
+              if (this.config.browser.isSafari) {
                 startPosition += 0.001;
               }
               _logger.logger.log('target start position not buffered, seek to buffered.start(' + i + ') ' + startPosition);
@@ -3537,7 +3534,7 @@ var StreamController = function (_EventHandler) {
 
 exports.default = StreamController;
 
-},{"../demux/demuxer":17,"../errors":21,"../event-handler":22,"../events":23,"../helper/buffer-helper":25,"../helper/level-helper":26,"../utils/binary-search":36,"../utils/browser":37,"../utils/logger":40}],9:[function(_dereq_,module,exports){
+},{"../demux/demuxer":17,"../errors":21,"../event-handler":22,"../events":23,"../helper/buffer-helper":25,"../helper/level-helper":26,"../utils/binary-search":36,"../utils/logger":40}],9:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4323,7 +4320,7 @@ var AACDemuxer = function () {
       }
 
       if (!track.audiosamplerate) {
-        config = _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec);
+        config = _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec, this.config);
         track.config = config.config;
         track.audiosamplerate = config.samplerate;
         track.channelCount = config.channelCount;
@@ -4424,7 +4421,7 @@ var ADTS = function () {
 
   _createClass(ADTS, null, [{
     key: 'getAudioConfig',
-    value: function getAudioConfig(observer, data, offset, audioCodec) {
+    value: function getAudioConfig(observer, data, offset, audioCodec, hlsConfig) {
       var adtsObjectType,
           // :int
       adtsSampleingIndex,
@@ -4434,7 +4431,7 @@ var ADTS = function () {
       adtsChanelConfig,
           // :int
       config,
-          userAgent = navigator.userAgent.toLowerCase(),
+          browser = hlsConfig.browser,
           adtsSampleingRates = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
       // byte 2
       adtsObjectType = ((data[offset + 2] & 0xC0) >>> 6) + 1;
@@ -4448,7 +4445,7 @@ var ADTS = function () {
       adtsChanelConfig |= (data[offset + 3] & 0xC0) >>> 6;
       _logger.logger.log('manifest codec:' + audioCodec + ',ADTS data:type:' + adtsObjectType + ',sampleingIndex:' + adtsSampleingIndex + '[' + adtsSampleingRates[adtsSampleingIndex] + 'Hz],channelConfig:' + adtsChanelConfig);
       // firefox: freq less than 24kHz = AAC SBR (HE-AAC)
-      if (userAgent.indexOf('firefox') !== -1) {
+      if (browser.isFirefox) {
         if (adtsSampleingIndex >= 6) {
           adtsObjectType = 5;
           config = new Array(4);
@@ -4462,7 +4459,7 @@ var ADTS = function () {
           adtsExtensionSampleingIndex = adtsSampleingIndex;
         }
         // Android : always use AAC
-      } else if (userAgent.indexOf('android') !== -1) {
+      } else if (browser.isAndroid) {
         adtsObjectType = 2;
         config = new Array(2);
         adtsExtensionSampleingIndex = adtsSampleingIndex;
@@ -6656,7 +6653,7 @@ var TSDemuxer = function () {
           return;
         }
       }
-      this.audioConfig = config = this.audioConfig || _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec);
+      this.audioConfig = config = this.audioConfig || _adts2.default.getAudioConfig(this.observer, data, offset, audioCodec, this.config);
       if (config && (track.audiosamplerate !== config.samplerate || track.codec !== config.codec)) {
         track.config = config.config;
         track.audiosamplerate = config.samplerate;
@@ -7537,6 +7534,10 @@ var _cues = _dereq_('./utils/cues');
 
 var _cues2 = _interopRequireDefault(_cues);
 
+var _browser = _dereq_('./utils/browser');
+
+var _browser2 = _interopRequireDefault(_browser);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -7567,20 +7568,13 @@ var Hls = function () {
   }, {
     key: 'isIe',
     value: function isIe() {
-      var res = void 0,
-          ua = typeof window !== 'undefined' && window.navigator && navigator.userAgent;
-      if (res = /[( ]MSIE ([6789]|10).\d[);]/.exec(ua)) {
-        return { browser: 'ie', version: res[1] };
-      }
-      if (res = /[( ]Trident\/\d+(\.\d)+.*rv:(\d\d)(\.\d)+[);]/.exec(ua)) {
-        return { browser: 'ie', version: res[2] };
-      }
+      return _browser2.default.init().isIe;
     }
   }, {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-186';
+      return '0.6.1-187';
     }
   }, {
     key: 'Events',
@@ -7650,7 +7644,8 @@ var Hls = function () {
           cueHandler: _cues2.default,
           enableCEA708Captions: true,
           enableMP2TPassThrough: false,
-          stretchShortVideoTrack: false
+          stretchShortVideoTrack: false,
+          browser: _browser2.default.init()
         };
       }
       return Hls.defaultConfig;
@@ -7971,7 +7966,7 @@ Hls.api.players = [];
 
 exports.default = Hls;
 
-},{"./controller/abr-controller":3,"./controller/buffer-controller":4,"./controller/cap-level-controller":5,"./controller/fps-controller":6,"./controller/level-controller":7,"./controller/stream-controller":8,"./controller/timeline-controller":9,"./errors":21,"./events":23,"./loader/fragment-loader":29,"./loader/key-loader":30,"./loader/playlist-loader":31,"./utils/cues":39,"./utils/logger":40,"./utils/xhr-loader":43,"events":1}],28:[function(_dereq_,module,exports){
+},{"./controller/abr-controller":3,"./controller/buffer-controller":4,"./controller/cap-level-controller":5,"./controller/fps-controller":6,"./controller/level-controller":7,"./controller/stream-controller":8,"./controller/timeline-controller":9,"./errors":21,"./events":23,"./loader/fragment-loader":29,"./loader/key-loader":30,"./loader/playlist-loader":31,"./utils/browser":37,"./utils/cues":39,"./utils/logger":40,"./utils/xhr-loader":43,"events":1}],28:[function(_dereq_,module,exports){
 'use strict';
 
 // This is mostly for support of the es6 module export
@@ -9208,10 +9203,6 @@ var _errors = _dereq_('../errors');
 
 _dereq_('../utils/polyfill');
 
-var _browser = _dereq_('../utils/browser');
-
-var _browser2 = _interopRequireDefault(_browser);
-
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -9227,7 +9218,6 @@ var MP4Remuxer = function () {
     this.PES2MP4SCALEFACTOR = 4;
     this.PES_TIMESCALE = 90000;
     this.MP4_TIMESCALE = this.PES_TIMESCALE / this.PES2MP4SCALEFACTOR;
-    this.isSafari = _browser2.default.isSafari();
   }
 
   _createClass(MP4Remuxer, [{
@@ -9395,8 +9385,9 @@ var MP4Remuxer = function () {
       var timeScale = this.PES_TIMESCALE;
 
       // if parsed fragment is contiguous with last one, let's use last DTS value as reference
-      var nextAvcDts = this.nextAvcDts;
-      var isSafari = this.isSafari;
+      var nextAvcDts = this.nextAvcDts,
+          config = this.config;
+      var isSafari = config.browser.isSafari;
 
       // if parsed fragment is contiguous with last one, let's use last DTS value as reference
       contiguous |= inputSamples.length && this.nextAvcDts && accurate && (Math.abs(timeOffset - nextAvcDts / timeScale) < 0.1 || Math.abs(inputSamples[0].dts - nextAvcDts - initDTS) < timeScale / 5);
@@ -9515,8 +9506,7 @@ var MP4Remuxer = function () {
           if (_i2 < inputSamples.length - 1) {
             mp4SampleDuration = inputSamples[_i2 + 1].dts - avcSample.dts;
           } else {
-            var config = this.config,
-                lastFrameDuration = avcSample.dts - inputSamples[_i2 > 0 ? _i2 - 1 : _i2].dts;
+            var lastFrameDuration = avcSample.dts - inputSamples[_i2 > 0 ? _i2 - 1 : _i2].dts;
             if (config.stretchShortVideoTrack) {
               // In some cases, a segment's audio track duration may exceed the video track duration.
               // Since we've already remuxed audio, and we know how long the audio track is, we look to
@@ -9575,7 +9565,7 @@ var MP4Remuxer = function () {
       this.nextAvcDts = lastDTS + mp4SampleDuration * pes2mp4ScaleFactor;
       track.len = 0;
       track.nbNalu = 0;
-      if (outputSamples.length && navigator.userAgent.toLowerCase().indexOf('chrome') > -1) {
+      if (outputSamples.length && config.browser.isChrome) {
         var flags = outputSamples[0].flags;
         // chrome workaround, mark first sample as being a Random Access Point to avoid sourcebuffer append issue
         // https://code.google.com/p/chromium/issues/detail?id=229412
@@ -9971,7 +9961,7 @@ var MP4Remuxer = function () {
 
 exports.default = MP4Remuxer;
 
-},{"../errors":21,"../events":23,"../helper/aac":24,"../remux/mp4-generator":32,"../utils/browser":37,"../utils/logger":40,"../utils/polyfill":41}],34:[function(_dereq_,module,exports){
+},{"../errors":21,"../events":23,"../helper/aac":24,"../remux/mp4-generator":32,"../utils/logger":40,"../utils/polyfill":41}],34:[function(_dereq_,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -10226,10 +10216,42 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 var browser = {
-  isSafari: function isSafari() {
-    var vendor = navigator.vendor,
-        userAgent = navigator.userAgent;
-    return vendor && vendor.indexOf('Apple') > -1 && userAgent && !userAgent.match('CriOS');
+  init: function init() {
+    var res = void 0,
+        ua = void 0,
+        info = void 0;
+    if (!(ua = typeof window !== 'undefined' && window.navigator && navigator.userAgent.toLowerCase())) {
+      return {};
+    }
+    if (res = /[( ]msie ([6789]|10).\d[);]/.exec(ua)) {
+      info = { browser: 'ie', version: res[1] };
+    }
+    if (res = /[( ]trident\/\d+(\.\d)+.*rv:(\d\d)(\.\d)+[);]/.exec(ua)) {
+      info = { browser: 'ie', version: res[2] };
+    }
+    if (ua.indexOf('firefox') > -1) {
+      info = { browser: 'firefox' };
+    }
+    if (ua.indexOf('chrome') > -1) {
+      info = { browser: 'chrome' };
+    }
+    if (ua.indexOf('android') > -1) {
+      info = { browser: 'android' };
+    }
+    var vendor = navigator.vendor;
+    if (vendor && vendor.indexOf('Apple') > -1 && !ua.match('CriOS')) {
+      info = { browser: 'safari' };
+    }
+    info = info || {};
+    return {
+      isIe: info.browser === 'ie',
+      isFirefox: info.browser === 'firefox',
+      isChrome: info.browser === 'Chrome',
+      isSafari: info.browser === 'safari',
+      isAndroid: info.browser === 'android',
+      browser: info,
+      ua: ua
+    };
   }
 };
 exports.default = browser;

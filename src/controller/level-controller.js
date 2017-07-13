@@ -63,7 +63,8 @@ class LevelController extends EventHandler {
         bitrateSet = {},
         videoCodecFound = false,
         audioCodecFound = false,
-        brokenmp4inmp3 = /chrome|firefox/.test(navigator.userAgent.toLowerCase()),
+        browser = this.hls.config.browser,
+        brokenmp4inmp3 = browser.isChrome || browser.isFirefox,
         checkSupported = function(type,codec) { return MediaSource.isTypeSupported(`${type}/mp4;codecs=${codec}`);};
 
     // regroup redundant level together

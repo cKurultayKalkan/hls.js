@@ -542,7 +542,7 @@ class BufferController extends EventHandler {
             bufStart = sb.buffered.start(i);
             bufEnd = sb.buffered.end(i);
             // workaround firefox not able to properly flush multiple buffered range.
-            if (navigator.userAgent.toLowerCase().indexOf('firefox') !== -1 && endOffset === Number.POSITIVE_INFINITY) {
+            if (this.hls.config.browser.isFirefox && endOffset === Number.POSITIVE_INFINITY) {
               flushStart = startOffset;
               flushEnd = endOffset;
             } else {

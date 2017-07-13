@@ -9,7 +9,6 @@ import {logger} from '../utils/logger';
 import MP4 from '../remux/mp4-generator';
 import {ErrorTypes, ErrorDetails} from '../errors';
 import '../utils/polyfill';
-import browser from '../utils/browser';
 
 class MP4Remuxer {
   constructor(observer, config, typeSupported) {
@@ -20,7 +19,6 @@ class MP4Remuxer {
     this.PES2MP4SCALEFACTOR = 4;
     this.PES_TIMESCALE = 90000;
     this.MP4_TIMESCALE = this.PES_TIMESCALE / this.PES2MP4SCALEFACTOR;
-    this.isSafari = browser.isSafari();
   }
 
   get passthrough() {
@@ -178,8 +176,8 @@ class MP4Remuxer {
     let timeScale = this.PES_TIMESCALE;
 
     // if parsed fragment is contiguous with last one, let's use last DTS value as reference
-    let nextAvcDts = this.nextAvcDts;
-    const isSafari = this.isSafari;
+    let nextAvcDts = this.nextAvcDts, config = this.config;
+    const isSafari = config.browser.isSafari;
 
     // if parsed fragment is contiguous with last one, let's use last DTS value as reference
     contiguous |= (inputSamples.length && this.nextAvcDts && accurate &&
@@ -300,8 +298,7 @@ class MP4Remuxer {
         if (i < inputSamples.length - 1) {
           mp4SampleDuration = inputSamples[i+1].dts - avcSample.dts;
         } else {
-          let config = this.config,
-              lastFrameDuration = avcSample.dts - inputSamples[i > 0 ? i-1 : i].dts;
+          let lastFrameDuration = avcSample.dts - inputSamples[i > 0 ? i-1 : i].dts;
           if (config.stretchShortVideoTrack) {
             // In some cases, a segment's audio track duration may exceed the video track duration.
             // Since we've already remuxed audio, and we know how long the audio track is, we look to
@@ -361,7 +358,7 @@ class MP4Remuxer {
     this.nextAvcDts = lastDTS + mp4SampleDuration*pes2mp4ScaleFactor;
     track.len = 0;
     track.nbNalu = 0;
-    if(outputSamples.length && navigator.userAgent.toLowerCase().indexOf('chrome') > -1) {
+    if(outputSamples.length && config.browser.isChrome) {
       let flags = outputSamples[0].flags;
     // chrome workaround, mark first sample as being a Random Access Point to avoid sourcebuffer append issue
     // https://code.google.com/p/chromium/issues/detail?id=229412

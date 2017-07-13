@@ -19,6 +19,7 @@ import XhrLoader from './utils/xhr-loader';
 import EventEmitter from 'events';
 import KeyLoader from './loader/key-loader';
 import Cues from './utils/cues';
+import browser from './utils/browser';
 
 class Hls {
 
@@ -58,13 +59,7 @@ class Hls {
   }
 
   static isIe() {
-    let res, ua = typeof window !== 'undefined' && window.navigator && navigator.userAgent;
-    if ((res = /[( ]MSIE ([6789]|10).\d[);]/.exec(ua))) {
-      return {browser: 'ie', version: res[1]};
-    }
-    if ((res = /[( ]Trident\/\d+(\.\d)+.*rv:(\d\d)(\.\d)+[);]/.exec(ua))) {
-      return {browser: 'ie', version: res[2]};
-    }
+    return browser.init().isIe;
   }
 
   static get DefaultConfig() {
@@ -119,6 +114,7 @@ class Hls {
           enableCEA708Captions: true,
           enableMP2TPassThrough : false,
           stretchShortVideoTrack: false,
+          browser: browser.init(),
         };
     }
     return Hls.defaultConfig;

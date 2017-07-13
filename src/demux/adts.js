@@ -6,13 +6,13 @@ import {ErrorTypes, ErrorDetails} from '../errors';
 
  class ADTS {
 
-  static getAudioConfig(observer, data, offset, audioCodec) {
+  static getAudioConfig(observer, data, offset, audioCodec, hlsConfig) {
     var adtsObjectType, // :int
         adtsSampleingIndex, // :int
         adtsExtensionSampleingIndex, // :int
         adtsChanelConfig, // :int
         config,
-        userAgent = navigator.userAgent.toLowerCase(),
+        browser = hlsConfig.browser,
         adtsSampleingRates = [
             96000, 88200,
             64000, 48000,
@@ -33,7 +33,7 @@ import {ErrorTypes, ErrorDetails} from '../errors';
     adtsChanelConfig |= ((data[offset + 3] & 0xC0) >>> 6);
     logger.log(`manifest codec:${audioCodec},ADTS data:type:${adtsObjectType},sampleingIndex:${adtsSampleingIndex}[${adtsSampleingRates[adtsSampleingIndex]}Hz],channelConfig:${adtsChanelConfig}`);
     // firefox: freq less than 24kHz = AAC SBR (HE-AAC)
-    if (userAgent.indexOf('firefox') !== -1) {
+    if (browser.isFirefox) {
       if (adtsSampleingIndex >= 6) {
         adtsObjectType = 5;
         config = new Array(4);
@@ -47,7 +47,7 @@ import {ErrorTypes, ErrorDetails} from '../errors';
         adtsExtensionSampleingIndex = adtsSampleingIndex;
       }
       // Android : always use AAC
-    } else if (userAgent.indexOf('android') !== -1) {
+    } else if (browser.isAndroid) {
       adtsObjectType = 2;
       config = new Array(2);
       adtsExtensionSampleingIndex = adtsSampleingIndex;

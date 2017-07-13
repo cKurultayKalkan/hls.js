@@ -10,7 +10,6 @@ import BinarySearch from '../utils/binary-search';
 import BufferHelper from '../helper/buffer-helper';
 import LevelHelper from '../helper/level-helper';
 import {ErrorTypes, ErrorDetails} from '../errors';
-import browser from '../utils/browser';
 
 const State = {
   STOPPED : 'STOPPED',
@@ -1041,7 +1040,7 @@ class StreamController extends EventHandler {
       track = tracks.audio;
       if (track) {
         var audioCodec = this.levels[this.level].audioCodec,
-            ua = navigator.userAgent.toLowerCase();
+            browser = this.config.browser;
         if(audioCodec && this.audioCodecSwap) {
           logger.log('swapping playlist audio codec');
           if(audioCodec.indexOf('mp4a.40.5') !==-1) {
@@ -1058,12 +1057,12 @@ class StreamController extends EventHandler {
             // don't force HE-AAC if mono stream
            if(track.metadata.channelCount !== 1 &&
             // don't force HE-AAC if firefox
-            ua.indexOf('firefox') === -1) {
+            !browser.isFirefox) {
               audioCodec = 'mp4a.40.5';
           }
         }
         // HE-AAC is broken on Android, always signal audio codec as AAC even if variant manifest states otherwise
-        if(ua.indexOf('android') !== -1 && track.container !== 'audio/mpeg') {
+        if (browser.isAndroid && track.container !== 'audio/mpeg') {
           audioCodec = 'mp4a.40.2';
           logger.log(`Android: force audio codec to ${audioCodec}`);
         }
@@ -1293,7 +1292,7 @@ class StreamController extends EventHandler {
               i = 0;
               startPosition = media.buffered.start(i);
             }
-            if (browser.isSafari()) {
+            if (this.config.browser.isSafari) {
               startPosition += 0.001;
             }
             logger.log(`target start position not buffered, seek to buffered.start(${i}) ${startPosition}`);

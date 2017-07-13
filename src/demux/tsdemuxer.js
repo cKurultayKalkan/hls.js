@@ -1116,7 +1116,7 @@
         return;
       }
     }
-    this.audioConfig = config = this.audioConfig || ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
+    this.audioConfig = config = this.audioConfig || ADTS.getAudioConfig(this.observer,data, offset, audioCodec, this.config);
     if (config && (track.audiosamplerate !== config.samplerate || track.codec !== config.codec)) {
       track.config = config.config;
       track.audiosamplerate = config.samplerate;

@@ -50,7 +50,7 @@ import Event from '../events';
     }
 
     if (!track.audiosamplerate) {
-      config = ADTS.getAudioConfig(this.observer,data, offset, audioCodec);
+      config = ADTS.getAudioConfig(this.observer,data, offset, audioCodec, this.config);
       track.config = config.config;
       track.audiosamplerate = config.samplerate;
       track.channelCount = config.channelCount;
