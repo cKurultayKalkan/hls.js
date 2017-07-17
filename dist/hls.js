@@ -2891,7 +2891,13 @@ var StreamController = function (_EventHandler) {
 
         if (lastDetails && _levelHelper2.default.canMerge(lastDetails, newDetails)) {
           curDetails = lastDetails;
+          this.reinit = false;
         } else if (curDetails && !_levelHelper2.default.canMerge(curDetails, newDetails)) {
+          var frag = curDetails.fragments[curDetails.fragments.length - 1];
+          if (frag && curDetails.startSN > newDetails.endSN) {
+            _levelHelper2.default.adjustSliding(newDetails.fragments, frag.start + frag.duration);
+            this.reinit = true;
+          }
           curDetails = undefined;
           this.hls.clearLevelDetails();
         }
@@ -3020,7 +3026,8 @@ var StreamController = function (_EventHandler) {
           var media = this.media;
           var mediaSeeking = media && media.seeking;
           var accurateTimeOffset = !mediaSeeking && (details.PTSKnown || !details.live);
-          demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, accurateTimeOffset, details.endSN);
+          demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, accurateTimeOffset, details.endSN, this.reinit);
+          this.reinit = false;
         }
         if (data.payload.final) {
           fragCurrent.loaded = true;
@@ -4650,7 +4657,7 @@ var DemuxerInline = function () {
     }
   }, {
     key: 'push',
-    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps) {
+    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps, reinit) {
       var demuxer = this.demuxer;
       if (!demuxer) {
         var hls = this.hls,
@@ -4689,7 +4696,7 @@ var DemuxerInline = function () {
       if (first) {
         this.timeOffset = timeOffset;
       }
-      demuxer.push(data, audioCodec, videoCodec, this.timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps);
+      demuxer.push(data, audioCodec, videoCodec, this.timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps, reinit);
     }
   }]);
 
@@ -4745,7 +4752,7 @@ var DemuxerWorker = function DemuxerWorker(self) {
         self.demuxer = new _demuxerInline2.default(observer, data.typeSupported, JSON.parse(data.config));
         break;
       case 'demux':
-        self.demuxer.push(new Uint8Array(data.data), data.audioCodec, data.videoCodec, data.timeOffset, data.cc, data.level, data.sn, data.duration, data.accurate, data.first, data.final, data.lastSN, data.keymaps);
+        self.demuxer.push(new Uint8Array(data.data), data.audioCodec, data.videoCodec, data.timeOffset, data.cc, data.level, data.sn, data.duration, data.accurate, data.first, data.final, data.lastSN, data.keymaps, data.reinit);
         break;
       case 'empty':
         self.postMessage({ event: _events2.default.DEMUXER_QUEUE_EMPTY });
@@ -4876,17 +4883,17 @@ var Demuxer = function () {
     }
   }, {
     key: 'pushDecrypted',
-    value: function pushDecrypted(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN) {
+    value: function pushDecrypted(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, reinit) {
       if (this.w) {
         // post fragment payload as transferable objects (no copy)
-        this.w.postMessage({ cmd: 'demux', data: data, audioCodec: audioCodec, videoCodec: videoCodec, timeOffset: timeOffset, cc: cc, level: level, sn: sn, duration: duration, accurate: accurate, first: first, final: final, lastSN: lastSN, keymaps: data.keymaps }, [data]);
+        this.w.postMessage({ cmd: 'demux', data: data, audioCodec: audioCodec, videoCodec: videoCodec, timeOffset: timeOffset, cc: cc, level: level, sn: sn, duration: duration, accurate: accurate, first: first, final: final, lastSN: lastSN, keymaps: data.keymaps, reinit: reinit }, [data]);
       } else {
-        this.demuxer.push(new Uint8Array(data), audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, data.keymaps);
+        this.demuxer.push(new Uint8Array(data), audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, data.keymaps, reinit);
       }
     }
   }, {
     key: 'push',
-    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, decryptdata, accurate, lastSN) {
+    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, decryptdata, accurate, lastSN, reinit) {
       if (data.first) {
         this.trail = new Uint8Array(0);
         this.trail.first = true;
@@ -4936,10 +4943,10 @@ var Demuxer = function () {
 
         var localthis = this;
         this.decrypter.decrypt(data, decryptdata.key, data.first && decryptdata.iv, function (decryptedData) {
-          localthis.pushDecrypted(decryptedData, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, !!data.first, !!data.final, lastSN);
+          localthis.pushDecrypted(decryptedData, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, !!data.first, !!data.final, lastSN, reinit);
         });
       } else {
-        this.pushDecrypted(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, !!data.first, !!data.final, lastSN);
+        this.pushDecrypted(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, !!data.first, !!data.final, lastSN, reinit);
       }
     }
   }, {
@@ -5653,7 +5660,7 @@ var TSDemuxer = function () {
 
   }, {
     key: 'push',
-    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps) {
+    value: function push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps, reinit) {
       var _this = this;
 
       var avcData = this._avcData,
@@ -5892,7 +5899,7 @@ var TSDemuxer = function () {
       if (this.gopStartDTS === undefined && this._avcTrack.samples.length) {
         this.gopStartDTS = this._avcTrack.samples[0].dts;
       }
-      this.remux(null, final, final && sn === lastSN, true);
+      this.remux(null, final, final && sn === lastSN, true, reinit);
       if (final) {
         this.fragStats.keymap.sps = this._avcTrack.sps || undefined;
         this.fragStats.keymap.pps = this._avcTrack.pps || undefined;
@@ -5938,7 +5945,7 @@ var TSDemuxer = function () {
     }
   }, {
     key: 'remux',
-    value: function remux(data, final, flush, lastSegment) {
+    value: function remux(data, final, flush, lastSegment, forceReinit) {
       var _saveAVCSamples = [],
           _saveAACSamples = [],
           _saveID3Samples = [],
@@ -5951,7 +5958,7 @@ var TSDemuxer = function () {
           reinit;
       var timescale = this.remuxer.PES_TIMESCALE;
       if (samples.length && final) {
-        reinit = this.remuxer._initDTS === undefined || this.accurate && Math.abs(samples[0].dts - this.remuxer.nextAvcDts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale && Math.abs(this._aacTrack.samples.length && this._aacTrack.samples[0].pts - this.remuxer.nextAacPts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale;
+        reinit = forceReinit || this.remuxer._initDTS === undefined || this.accurate && Math.abs(samples[0].dts - this.remuxer.nextAvcDts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale && Math.abs(this._aacTrack.samples.length && this._aacTrack.samples[0].pts - this.remuxer.nextAacPts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale;
         initDTS = reinit ? samples[0].dts - timescale * this.timeOffset : this.remuxer._initDTS;
         // if we have a big gap (>maxBufferHole) between adjacent segments, it
         // means we don't really have accurate segment timing and have to reinit
@@ -7359,6 +7366,13 @@ var LevelHelper = function () {
       return { start: 1, end: 0, delta: 0 };
     }
   }, {
+    key: 'adjustSliding',
+    value: function adjustSliding(fragments, sliding) {
+      for (var i = 0; i < fragments.length; i++) {
+        fragments[i].start += sliding;
+      }
+    }
+  }, {
     key: 'mergeDetails',
     value: function mergeDetails(oldDetails, newDetails) {
       var oldfragments = oldDetails.fragments,
@@ -7411,10 +7425,7 @@ var LevelHelper = function () {
         // in that case we also need to adjust start offset of all fragments
         if (delta >= 0 && delta < oldfragments.length) {
           // adjust start by sliding offset
-          var sliding = oldfragments[delta].start;
-          for (i = 0; i < newfragments.length; i++) {
-            newfragments[i].start += sliding;
-          }
+          this.adjustSliding(newfragments, oldfragments[delta].start);
         }
       }
       // if we are here, it means we have fragments overlapping between
@@ -7613,7 +7624,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-188';
+      return '0.6.1-189';
     }
   }, {
     key: 'Events',

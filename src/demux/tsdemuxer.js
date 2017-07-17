@@ -104,7 +104,7 @@
   }
 
   // feed incoming data to the front of the parsing pipeline
-  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps){
+  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps, reinit){
     var avcData = this._avcData, aacData = this._aacData, pes,
         id3Data = this._id3Data, start, len = data.length, stt, pid, atf, info, num,
         offset, codecsOnly = this.remuxer.passthrough, unknownPIDs = false;
@@ -327,7 +327,7 @@
     if (this.gopStartDTS === undefined && this._avcTrack.samples.length) {
       this.gopStartDTS = this._avcTrack.samples[0].dts;
     }
-    this.remux(null, final, final && sn === lastSN, true);
+    this.remux(null, final, final && sn === lastSN, true, reinit);
     if (final) {
       this.fragStats.keymap.sps = this._avcTrack.sps||undefined;
       this.fragStats.keymap.pps = this._avcTrack.pps||undefined;
@@ -372,13 +372,13 @@
     this._recalcTrack(track);
   }
 
-  remux(data, final, flush, lastSegment) {
+  remux(data, final, flush, lastSegment, forceReinit) {
     var _saveAVCSamples = [], _saveAACSamples = [], _saveID3Samples = [],
         _saveTextSamples = [], maxk, samples = this._avcTrack.samples,
         segStartDTS, segEndDTS, initDTS, reinit;
     let timescale = this.remuxer.PES_TIMESCALE;
     if (samples.length && final) {
-      reinit = this.remuxer._initDTS === undefined ||
+      reinit = forceReinit || this.remuxer._initDTS === undefined ||
         this.accurate && Math.abs(samples[0].dts-this.remuxer.nextAvcDts-
           this.remuxer._initDTS) > this.config.maxBufferHole*timescale &&
         Math.abs(this._aacTrack.samples.length &&

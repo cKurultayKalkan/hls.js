@@ -893,7 +893,13 @@ class StreamController extends EventHandler {
 
       if (lastDetails && LevelHelper.canMerge(lastDetails, newDetails)) {
         curDetails = lastDetails;
+        this.reinit = false;
       } else if (curDetails && !LevelHelper.canMerge(curDetails, newDetails)) {
+        let frag = curDetails.fragments[curDetails.fragments.length-1];
+        if (frag && curDetails.startSN>newDetails.endSN) {
+          LevelHelper.adjustSliding(newDetails.fragments, frag.start+frag.duration);
+          this.reinit = true;
+        }
         curDetails = undefined;
         this.hls.clearLevelDetails();
       }
@@ -1021,7 +1027,8 @@ class StreamController extends EventHandler {
         let media = this.media;
         let mediaSeeking = media && media.seeking;
         let accurateTimeOffset = !mediaSeeking && (details.PTSKnown || !details.live);
-        demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, accurateTimeOffset, details.endSN);
+        demuxer.push(data.payload, audioCodec, fragLevel.videoCodec, start, fragCurrent.cc, level, sn, duration, fragCurrent.decryptdata, accurateTimeOffset, details.endSN, this.reinit);
+        this.reinit = false;
       }
       if (data.payload.final) {
         fragCurrent.loaded = true;

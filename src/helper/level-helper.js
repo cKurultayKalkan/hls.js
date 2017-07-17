@@ -57,6 +57,12 @@ class LevelHelper {
     return {start: 1, end: 0, delta: 0};
   }
 
+  static adjustSliding(fragments, sliding) {
+    for (var i = 0 ; i < fragments.length; i++) {
+      fragments[i].start += sliding;
+    }
+  }
+
   static mergeDetails(oldDetails, newDetails) {
     var oldfragments = oldDetails.fragments,
         newfragments = newDetails.fragments,
@@ -102,10 +108,7 @@ class LevelHelper {
       // in that case we also need to adjust start offset of all fragments
       if (delta >= 0 && delta < oldfragments.length) {
         // adjust start by sliding offset
-        var sliding = oldfragments[delta].start;
-        for(i = 0 ; i < newfragments.length ; i++) {
-          newfragments[i].start += sliding;
-        }
+        this.adjustSliding(newfragments, oldfragments[delta].start);
       }
     }
     // if we are here, it means we have fragments overlapping between

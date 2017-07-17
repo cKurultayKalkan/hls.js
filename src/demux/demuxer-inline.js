@@ -34,7 +34,7 @@ class DemuxerInline {
     this.hls.off(Event.FRAG_PARSING_DATA, this.onFragParsingData);
   }
 
-  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps) {
+  push(data, audioCodec, videoCodec, timeOffset, cc, level, sn, duration, accurate, first, final, lastSN, keymaps, reinit) {
     var demuxer = this.demuxer;
     if (!demuxer) {
       var hls = this.hls,
@@ -71,7 +71,7 @@ class DemuxerInline {
     if (first) {
       this.timeOffset = timeOffset;
     }
-    demuxer.push(data,audioCodec,videoCodec,this.timeOffset,cc,level,sn,duration,accurate,first,final,lastSN,keymaps);
+    demuxer.push(data,audioCodec,videoCodec,this.timeOffset,cc,level,sn,duration,accurate,first,final,lastSN,keymaps,reinit);
   }
 }
 
