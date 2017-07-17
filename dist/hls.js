@@ -2618,9 +2618,8 @@ var StreamController = function (_EventHandler) {
       this.fragCurrent = null;
       // increase fragment load Index to avoid frag loop loading error after buffer flush
       this.fragLoadIdx += 2 * this.config.fragLoadingLoopThreshold;
-      this.state = State.PAUSED;
       // flush everything
-      this.hls.trigger(_events2.default.BUFFER_FLUSHING, { startOffset: 0, endOffset: Number.POSITIVE_INFINITY });
+      this.flushMainBuffer(0, Number.POSITIVE_INFINITY);
     }
 
     /*
@@ -2664,8 +2663,7 @@ var StreamController = function (_EventHandler) {
         if (currentRange && currentRange.start > 1) {
           // flush buffer preceding current fragment (flush until current fragment start offset)
           // minus 1s to avoid video freezing, that could happen if we flush keyframe of current video ...
-          this.state = State.PAUSED;
-          this.hls.trigger(_events2.default.BUFFER_FLUSHING, { startOffset: 0, endOffset: currentRange.start - 1 });
+          this.flushMainBuffer(0, currentRange.start - 1);
         }
         if (!media.paused) {
           // add a safety delay of 1s
@@ -2694,11 +2692,21 @@ var StreamController = function (_EventHandler) {
             }
             this.fragCurrent = null;
             // flush position is the start position of this new buffer
-            this.state = State.PAUSED;
-            this.hls.trigger(_events2.default.BUFFER_FLUSHING, { startOffset: nextRange.start, endOffset: Number.POSITIVE_INFINITY });
+            this.flushMainBuffer(nextRange.start, Number.POSITIVE_INFINITY);
           }
         }
       }
+    }
+  }, {
+    key: 'flushMainBuffer',
+    value: function flushMainBuffer(startOffset, endOffset) {
+      this.state = State.PAUSED;
+      var flushScope = { startOffset: startOffset, endOffset: endOffset };
+      // if alternate audio tracks are used, only flush video, otherwise flush everything
+      if (this.altAudio) {
+        flushScope.type = 'video';
+      }
+      this.hls.trigger(_events2.default.BUFFER_FLUSHING, flushScope);
     }
   }, {
     key: 'onMediaAttached',
@@ -3117,6 +3125,8 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'onFragParsingData',
     value: function onFragParsingData(data) {
+      var _this2 = this;
+
       if (this.state === State.PARSING || this.fragParsing) {
         this.tparse2 = Date.now();
         var frag = this.fragCurrent || this.fragParsing;
@@ -3136,7 +3146,9 @@ var StreamController = function (_EventHandler) {
         }
 
         [data.data1, data.data2].forEach(function (buffer) {
-          if (buffer) {
+          // only append in PARSING state (rationale is that an appending error could happen synchronously on first segment appending)
+          // in that case it is useless to append following segments
+          if (buffer && buffer.length && _this2.state === State.PARSING) {
             hls.trigger(_events2.default.BUFFER_APPENDING, { type: data.type, data: buffer });
           }
         });
@@ -3193,7 +3205,7 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'onFragAppended',
     value: function onFragAppended() {
-      var _this2 = this;
+      var _this3 = this;
 
       //trigger handler right now
       if (this.state === State.PARSED) {
@@ -3203,7 +3215,7 @@ var StreamController = function (_EventHandler) {
           _logger.logger.log('media buffered : ' + this.timeRangesToString(this.media.buffered));
           // filter potentially evicted bufferRange. this is to avoid memleak on live streams
           var bufferRange = this.bufferRange.filter(function (range) {
-            return _bufferHelper2.default.isBuffered(_this2.media, (range.start + range.end) / 2);
+            return _bufferHelper2.default.isBuffered(_this3.media, (range.start + range.end) / 2);
           });
           // push new range
           bufferRange.push({ type: frag.type, start: frag.startPTS, end: frag.endPTS, frag: frag });
@@ -3263,14 +3275,41 @@ var StreamController = function (_EventHandler) {
           }
           break;
         case _errors.ErrorDetails.BUFFER_FULL_ERROR:
-          // trigger a smooth level switch to empty buffers
-          // also reduce max buffer length as it might be too high. we do this to avoid loop flushing ...
-          this.config.maxMaxBufferLength /= 2;
-          _logger.logger.warn('reduce max buffer length to ' + this.config.maxMaxBufferLength + 's and trigger a nextLevelSwitch to flush old buffer and fix QuotaExceededError');
-          this.nextLevelSwitch();
+          // if in appending state
+          if (this.state === State.PARSING || this.state === State.PARSED) {
+            var media = this.media,
+
+            // 0.5 : tolerance needed as some browsers stalls playback before reaching buffered end
+            mediaBuffered = media && _bufferHelper2.default.isBuffered(media, media.currentTime) && _bufferHelper2.default.isBuffered(media, media.currentTime + 0.5);
+            // reduce max buf len if current position is buffered
+            if (mediaBuffered) {
+              this._reduceMaxBufferLength(this.config.maxBufferLength);
+              this.state = State.IDLE;
+            } else {
+              // current position is not buffered, but browser is still complaining about buffer full error
+              // this happens on IE/Edge, refer to https://github.com/video-dev/hls.js/pull/708
+              // in that case flush the whole buffer to recover
+              _logger.logger.warn('buffer full error also media.currentTime is not buffered, flush everything');
+              this.fragCurrent = null;
+              // flush everything
+              this.flushMainBuffer(0, Number.POSITIVE_INFINITY);
+            }
+          }
           break;
         default:
           break;
+      }
+    }
+  }, {
+    key: '_reduceMaxBufferLength',
+    value: function _reduceMaxBufferLength(minLength) {
+      var config = this.config;
+      if (config.maxMaxBufferLength >= minLength) {
+        // reduce max buffer length as it might be too high. we do this to avoid loop flushing ...
+        config.maxMaxBufferLength /= 2;
+        _logger.logger.warn('reduce max buffer length to ' + config.maxMaxBufferLength + 's');
+        // increase fragment load Index to avoid frag loop loading error after buffer flush
+        this.fragLoadIdx += 2 * config.fragLoadingLoopThreshold;
       }
     }
   }, {
@@ -3425,11 +3464,11 @@ var StreamController = function (_EventHandler) {
   }, {
     key: 'onBufferFlushed',
     value: function onBufferFlushed() {
-      var _this3 = this;
+      var _this4 = this;
 
       // after successful buffer flushing, filter flushed fragments from bufferRange
       this.bufferRange = this.bufferRange.filter(function (range) {
-        return _bufferHelper2.default.isBuffered(_this3.media, (range.start + range.end) / 2);
+        return _bufferHelper2.default.isBuffered(_this4.media, (range.start + range.end) / 2);
       });
 
       // handle end of immediate switching if needed
@@ -7574,7 +7613,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-187';
+      return '0.6.1-188';
     }
   }, {
     key: 'Events',
