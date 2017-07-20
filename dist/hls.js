@@ -3184,7 +3184,7 @@ var StreamController = function (_EventHandler) {
           frag.deltaPTS = this.config.maxSeekHole + 1;
         }
         var curSNIdx = frag.sn - details.startSN;
-        if (curSNIdx) {
+        if (curSNIdx >= 0) {
           var detFrag = details.fragments[curSNIdx];
           detFrag.loadCounter = frag.loadCounter;
           var sameLevel = fragPrevious && frag.level === fragPrevious.level;
@@ -7624,7 +7624,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-189';
+      return '0.6.1-190';
     }
   }, {
     key: 'Events',

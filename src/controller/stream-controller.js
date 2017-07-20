@@ -1175,7 +1175,7 @@ class StreamController extends EventHandler {
         frag.deltaPTS = this.config.maxSeekHole+1;
       }
       const curSNIdx = frag.sn - details.startSN;
-      if (curSNIdx) {
+      if (curSNIdx>=0) {
         let detFrag = details.fragments[curSNIdx];
         detFrag.loadCounter = frag.loadCounter;
         const sameLevel = fragPrevious && frag.level === fragPrevious.level;
