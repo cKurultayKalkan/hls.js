@@ -7625,7 +7625,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-191';
+      return '0.6.1-192';
     }
   }, {
     key: 'Events',
@@ -9441,7 +9441,7 @@ var MP4Remuxer = function () {
       var isSafari = config.browser.isSafari;
 
       // if parsed fragment is contiguous with last one, let's use last DTS value as reference
-      contiguous |= inputSamples.length && this.nextAvcDts && accurate && (Math.abs(timeOffset - nextAvcDts / timeScale) < 0.1 || Math.abs(inputSamples[0].dts - nextAvcDts - initDTS) < timeScale / 5);
+      contiguous |= inputSamples.length && this.nextAvcDts && accurate && !stats.dropped && (Math.abs(timeOffset - nextAvcDts / timeScale) < 0.1 || Math.abs(inputSamples[0].dts - nextAvcDts - initDTS) < timeScale / 5);
 
       if (!contiguous) {
         // if not contiguous, let's use target timeOffset
