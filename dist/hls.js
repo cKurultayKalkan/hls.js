@@ -7625,7 +7625,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-192';
+      return '0.6.1-193';
     }
   }, {
     key: 'Events',
@@ -10297,7 +10297,7 @@ var browser = {
     return {
       isIe: info.browser === 'ie',
       isFirefox: info.browser === 'firefox',
-      isChrome: info.browser === 'Chrome',
+      isChrome: info.browser === 'chrome',
       isSafari: info.browser === 'safari',
       isAndroid: info.browser === 'android',
       browser: info,

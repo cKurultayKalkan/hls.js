@@ -27,7 +27,7 @@ var browser = {
       return {
         isIe: info.browser === 'ie',
         isFirefox: info.browser === 'firefox',
-        isChrome: info.browser === 'Chrome',
+        isChrome: info.browser === 'chrome',
         isSafari: info.browser === 'safari',
         isAndroid: info.browser === 'android',
         browser: info,
