@@ -2768,6 +2768,10 @@ var StreamController = function (_EventHandler) {
           currentTime = media ? media.currentTime : undefined;
       _logger.logger.log('media seeking to ' + currentTime);
       var fragCurrent = this.fragCurrent;
+      if (currentTime !== undefined && media.buffered.length && media.buffered.start(0) > currentTime && media.buffered.start(0) - currentTime < 0.5) {
+        // adjust seek position to fix buffer stalling
+        media.currentTime = media.buffered.start(0) + 0.001;
+      }
       if (this.state === State.FRAG_LOADING) {
         var bufferInfo = _bufferHelper2.default.bufferInfo(media, currentTime, this.config.maxBufferHole);
         // check if we are seeking to a unbuffered area AND if frag loading is in progress
@@ -3354,9 +3358,7 @@ var StreamController = function (_EventHandler) {
                 i = 0;
                 startPosition = media.buffered.start(i);
               }
-              if (this.config.browser.isSafari) {
-                startPosition += 0.001;
-              }
+              startPosition += 0.001;
               _logger.logger.log('target start position not buffered, seek to buffered.start(' + i + ') ' + startPosition);
             }
             _logger.logger.log('adjust currentTime from ' + currentTime + ' to ' + startPosition);
@@ -5699,6 +5701,9 @@ var TSDemuxer = function () {
         this.lastCC = cc;
       }
       var trackSwitch = level !== this.lastLevel && !keymaps;
+      if (keymaps) {
+        _logger.logger.log('got mixed segment ' + keymaps.firstSN + ' ' + keymaps.switchPoint);
+      }
       if (trackSwitch) {
         _logger.logger.log('level switch detected');
         this.switchLevel();
@@ -7625,7 +7630,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-193';
+      return '0.6.1-194';
     }
   }, {
     key: 'Events',
@@ -8893,8 +8898,7 @@ var MP4 = function () {
     key: 'mfhd',
     value: function mfhd(sequenceNumber) {
       return MP4.box(MP4.types.mfhd, new Uint8Array([0x00, 0x00, 0x00, 0x00, // flags
-      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]) // sequence_number
-      );
+      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]));
     }
   }, {
     key: 'minf',
@@ -9135,8 +9139,7 @@ var MP4 = function () {
       var lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
       return MP4.box(MP4.types.traf, MP4.box(MP4.types.tfhd, new Uint8Array([0x00, // version 0
       0x00, 0x00, 0x00, // flags
-      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF]) // track_ID
-      ), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
+      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF])), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
       0x00, 0x00, 0x00, // flags
       upperWordBaseMediaDecodeTime >>> 24 & 0xFF, upperWordBaseMediaDecodeTime >>> 16 & 0xFF, upperWordBaseMediaDecodeTime >>> 8 & 0xFF, upperWordBaseMediaDecodeTime & 0xFF, lowerWordBaseMediaDecodeTime >>> 24 & 0xFF, lowerWordBaseMediaDecodeTime >>> 16 & 0xFF, lowerWordBaseMediaDecodeTime >>> 8 & 0xFF, lowerWordBaseMediaDecodeTime & 0xFF])), MP4.trun(track, sampleDependencyTable.length + 16 + // tfhd
       20 + // tfdt

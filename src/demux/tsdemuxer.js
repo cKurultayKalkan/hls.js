@@ -127,6 +127,9 @@
       this.lastCC = cc;
     }
     const trackSwitch = level !== this.lastLevel && !keymaps;
+    if (keymaps) {
+        logger.log(`got mixed segment ${keymaps.firstSN} ${keymaps.switchPoint}`);
+    }
     if (trackSwitch) {
       logger.log('level switch detected');
       this.switchLevel();

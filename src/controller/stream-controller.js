@@ -775,6 +775,10 @@ class StreamController extends EventHandler {
     let media = this.media, currentTime = media ? media.currentTime : undefined;
     logger.log('media seeking to ' + currentTime);
     let fragCurrent = this.fragCurrent;
+    if (currentTime !== undefined && media.buffered.length && media.buffered.start(0)>currentTime && media.buffered.start(0)-currentTime<0.5) {
+      // adjust seek position to fix buffer stalling
+      media.currentTime = media.buffered.start(0)+0.001;
+    }
     if (this.state === State.FRAG_LOADING) {
       let bufferInfo = BufferHelper.bufferInfo(media, currentTime, this.config.maxBufferHole);
       // check if we are seeking to a unbuffered area AND if frag loading is in progress
@@ -1333,9 +1337,7 @@ class StreamController extends EventHandler {
               i = 0;
               startPosition = media.buffered.start(i);
             }
-            if (this.config.browser.isSafari) {
-              startPosition += 0.001;
-            }
+            startPosition += 0.001;
             logger.log(`target start position not buffered, seek to buffered.start(${i}) ${startPosition}`);
           }
           logger.log(`adjust currentTime from ${currentTime} to ${startPosition}`);
