@@ -2444,7 +2444,7 @@ var StreamController = function (_EventHandler) {
         var prevFrag = fragments[curSNIdx - 1];
         var nextFrag = fragments[curSNIdx + 1];
         _logger.logger.log('find SN matching with pos:' + bufferEnd + ':' + frag.sn);
-        var ignoreBacktrack = !frag.backtracked || frag.backtracked && !frag.dropped && !nextFrag || frag.backtracked && frag.lastGop && bufferEnd >= frag.lastGop;
+        var ignoreBacktrack = !frag.backtracked || frag.backtracked && (!frag.dropped && !nextFrag || frag.lastGop && bufferEnd >= frag.lastGop || fragPrevious && prevFrag && fragPrevious.level === prevFrag.level && fragPrevious.sn === prevFrag.sn);
         if (ignoreBacktrack && fragPrevious && frag.sn === fragPrevious.sn) {
           if (frag.sn < levelDetails.endSN) {
             var deltaPTS = fragPrevious.deltaPTS;
@@ -2475,7 +2475,7 @@ var StreamController = function (_EventHandler) {
             }
             frag = null;
           }
-        } else if (frag.dropped && frag.backtracked) {
+        } else if (frag.dropped && !ignoreBacktrack) {
           // Only backtrack a max of 1 consecutive fragment to prevent sliding back too far when little or no frags start with keyframes
           if (nextFrag && nextFrag.backtracked) {
             _logger.logger.log('Already backtracked from fragment ' + (curSNIdx + 1) + ', will not backtrack to fragment ' + curSNIdx + '. Loading fragment ' + (curSNIdx + 1));
@@ -7630,7 +7630,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-194';
+      return '0.6.1-195';
     }
   }, {
     key: 'Events',
@@ -8898,7 +8898,8 @@ var MP4 = function () {
     key: 'mfhd',
     value: function mfhd(sequenceNumber) {
       return MP4.box(MP4.types.mfhd, new Uint8Array([0x00, 0x00, 0x00, 0x00, // flags
-      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]));
+      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]) // sequence_number
+      );
     }
   }, {
     key: 'minf',
@@ -9139,7 +9140,8 @@ var MP4 = function () {
       var lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
       return MP4.box(MP4.types.traf, MP4.box(MP4.types.tfhd, new Uint8Array([0x00, // version 0
       0x00, 0x00, 0x00, // flags
-      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF])), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
+      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF]) // track_ID
+      ), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
       0x00, 0x00, 0x00, // flags
       upperWordBaseMediaDecodeTime >>> 24 & 0xFF, upperWordBaseMediaDecodeTime >>> 16 & 0xFF, upperWordBaseMediaDecodeTime >>> 8 & 0xFF, upperWordBaseMediaDecodeTime & 0xFF, lowerWordBaseMediaDecodeTime >>> 24 & 0xFF, lowerWordBaseMediaDecodeTime >>> 16 & 0xFF, lowerWordBaseMediaDecodeTime >>> 8 & 0xFF, lowerWordBaseMediaDecodeTime & 0xFF])), MP4.trun(track, sampleDependencyTable.length + 16 + // tfhd
       20 + // tfdt

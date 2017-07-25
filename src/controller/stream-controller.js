@@ -433,7 +433,8 @@ class StreamController extends EventHandler {
       const prevFrag = fragments[curSNIdx - 1];
       const nextFrag = fragments[curSNIdx + 1];
       logger.log('find SN matching with pos:' +  bufferEnd + ':' + frag.sn);
-      let ignoreBacktrack = !frag.backtracked || frag.backtracked && !frag.dropped && !nextFrag || frag.backtracked && frag.lastGop && bufferEnd >= frag.lastGop;
+      let ignoreBacktrack = !frag.backtracked || frag.backtracked && (!frag.dropped && !nextFrag || frag.lastGop && bufferEnd >= frag.lastGop ||
+            fragPrevious && prevFrag && fragPrevious.level === prevFrag.level && fragPrevious.sn === prevFrag.sn);
       if (ignoreBacktrack && fragPrevious && frag.sn === fragPrevious.sn) {
         if (frag.sn < levelDetails.endSN) {
           let deltaPTS = fragPrevious.deltaPTS;
@@ -464,7 +465,7 @@ class StreamController extends EventHandler {
           }
           frag = null;
         }
-      } else if (frag.dropped && frag.backtracked) {
+      } else if (frag.dropped && !ignoreBacktrack) {
         // Only backtrack a max of 1 consecutive fragment to prevent sliding back too far when little or no frags start with keyframes
         if (nextFrag && nextFrag.backtracked) {
           logger.log(`Already backtracked from fragment ${curSNIdx + 1}, will not backtrack to fragment ${curSNIdx}. Loading fragment ${curSNIdx + 1}`);
