@@ -934,6 +934,7 @@ var BufferController = function (_EventHandler) {
       this.sourceBuffer = {};
       this.flushRange = [];
       this.appended = 0;
+      this.segments = [];
       this.dumpSegments = undefined;
     }
   }, {
@@ -7630,7 +7631,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-195';
+      return '0.6.1-196';
     }
   }, {
     key: 'Events',

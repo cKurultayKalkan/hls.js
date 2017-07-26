@@ -266,6 +266,7 @@ class BufferController extends EventHandler {
     this.sourceBuffer = {};
     this.flushRange = [];
     this.appended = 0;
+    this.segments = [];
     this.dumpSegments = undefined;
   }
 
