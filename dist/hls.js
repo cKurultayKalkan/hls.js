@@ -5232,7 +5232,6 @@ var ExpGolomb = function () {
           frameCropRightOffset = 0,
           frameCropTopOffset = 0,
           frameCropBottomOffset = 0,
-          sarScale = 1,
           profileIdc,
           profileCompat,
           levelIdc,
@@ -5301,59 +5300,57 @@ var ExpGolomb = function () {
         frameCropTopOffset = this.readUEG();
         frameCropBottomOffset = this.readUEG();
       }
+      var pixelRatio = [1, 1];
       if (this.readBoolean()) {
         // vui_parameters_present_flag
         if (this.readBoolean()) {
           // aspect_ratio_info_present_flag
-          var sarRatio = void 0;
           var aspectRatioIdc = this.readUByte();
           switch (aspectRatioIdc) {
             case 1:
-              sarRatio = [1, 1];break;
+              pixelRatio = [1, 1];break;
             case 2:
-              sarRatio = [12, 11];break;
+              pixelRatio = [12, 11];break;
             case 3:
-              sarRatio = [10, 11];break;
+              pixelRatio = [10, 11];break;
             case 4:
-              sarRatio = [16, 11];break;
+              pixelRatio = [16, 11];break;
             case 5:
-              sarRatio = [40, 33];break;
+              pixelRatio = [40, 33];break;
             case 6:
-              sarRatio = [24, 11];break;
+              pixelRatio = [24, 11];break;
             case 7:
-              sarRatio = [20, 11];break;
+              pixelRatio = [20, 11];break;
             case 8:
-              sarRatio = [32, 11];break;
+              pixelRatio = [32, 11];break;
             case 9:
-              sarRatio = [80, 33];break;
+              pixelRatio = [80, 33];break;
             case 10:
-              sarRatio = [18, 11];break;
+              pixelRatio = [18, 11];break;
             case 11:
-              sarRatio = [15, 11];break;
+              pixelRatio = [15, 11];break;
             case 12:
-              sarRatio = [64, 33];break;
+              pixelRatio = [64, 33];break;
             case 13:
-              sarRatio = [160, 99];break;
+              pixelRatio = [160, 99];break;
             case 14:
-              sarRatio = [4, 3];break;
+              pixelRatio = [4, 3];break;
             case 15:
-              sarRatio = [3, 2];break;
+              pixelRatio = [3, 2];break;
             case 16:
-              sarRatio = [2, 1];break;
+              pixelRatio = [2, 1];break;
             case 255:
               {
-                sarRatio = [this.readUByte() << 8 | this.readUByte(), this.readUByte() << 8 | this.readUByte()];
+                pixelRatio = [this.readUByte() << 8 | this.readUByte(), this.readUByte() << 8 | this.readUByte()];
                 break;
               }
-          }
-          if (sarRatio) {
-            sarScale = sarRatio[0] / sarRatio[1];
           }
         }
       }
       return {
-        width: Math.ceil(((picWidthInMbsMinus1 + 1) * 16 - frameCropLeftOffset * 2 - frameCropRightOffset * 2) * sarScale),
-        height: (2 - frameMbsOnlyFlag) * (picHeightInMapUnitsMinus1 + 1) * 16 - (frameMbsOnlyFlag ? 2 : 4) * (frameCropTopOffset + frameCropBottomOffset)
+        width: Math.ceil((picWidthInMbsMinus1 + 1) * 16 - frameCropLeftOffset * 2 - frameCropRightOffset * 2),
+        height: (2 - frameMbsOnlyFlag) * (picHeightInMapUnitsMinus1 + 1) * 16 - (frameMbsOnlyFlag ? 2 : 4) * (frameCropTopOffset + frameCropBottomOffset),
+        pixelRatio: pixelRatio
       };
     }
   }, {
@@ -6436,6 +6433,7 @@ var TSDemuxer = function () {
               var config = expGolombDecoder.readSPS();
               track.width = config.width;
               track.height = config.height;
+              track.pixelRatio = config.pixelRatio;
               track.sps = [unit.data];
               track.duration = _this2._duration;
               var codecarray = unit.data.subarray(1, 4);
@@ -7631,7 +7629,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-196';
+      return '0.6.1-197';
     }
   }, {
     key: 'Events',
@@ -8749,6 +8747,7 @@ var MP4 = function () {
         '.mp3': [],
         mvex: [],
         mvhd: [],
+        pasp: [],
         sdtp: [],
         stbl: [],
         stco: [],
@@ -9022,7 +9021,9 @@ var MP4 = function () {
       ]).concat(pps))),
           // "PPS"
       width = track.width,
-          height = track.height;
+          height = track.height,
+          hSpacing = track.pixelRatio[0],
+          vSpacing = track.pixelRatio[1];
       //console.log('avcc:' + Hex.hexDump(avcc));
       return MP4.box(MP4.types.avc1, new Uint8Array([0x00, 0x00, 0x00, // reserved
       0x00, 0x00, 0x00, // reserved
@@ -9042,8 +9043,10 @@ var MP4 = function () {
       0x11, 0x11]), // pre_defined = -1
       avcc, MP4.box(MP4.types.btrt, new Uint8Array([0x00, 0x1c, 0x9c, 0x80, // bufferSizeDB
       0x00, 0x2d, 0xc6, 0xc0, // maxBitrate
-      0x00, 0x2d, 0xc6, 0xc0])) // avgBitrate
-      );
+      0x00, 0x2d, 0xc6, 0xc0])), // avgBitrate
+      MP4.box(MP4.types.pasp, new Uint8Array([hSpacing >> 24, // hSpacing
+      hSpacing >> 16 & 0xFF, hSpacing >> 8 & 0xFF, hSpacing & 0xFF, vSpacing >> 24, // vSpacing
+      vSpacing >> 16 & 0xFF, vSpacing >> 8 & 0xFF, vSpacing & 0xFF])));
     }
   }, {
     key: 'esds',
