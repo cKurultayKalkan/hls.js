@@ -5759,7 +5759,7 @@ var TSDemuxer = function () {
               if (stt) {
                 this.fragStats.keymap.first = this.fragStats.keymap.first || start;
                 if (pes = this._parsePES(avcData)) {
-                  this._parseAVCPES(pes);
+                  this._parseAVCPES(pes, !final);
                   if (codecsOnly) {
                     // if we have video codec info AND
                     // if audio PID is undefined OR if we have audio codec info,
@@ -5879,8 +5879,11 @@ var TSDemuxer = function () {
       // parse last PES packet
       if (final) {
         if (avcData.size && (pes = this._parsePES(avcData))) {
-          this._parseAVCPES(pes);
+          this._parseAVCPES(pes, true);
           this._clearAvcData();
+        } else if (this.avcSample) {
+          this.pushAccessUnit(this.avcSample, this._avcTrack);
+          this.avcSample = null;
         }
         if (aacData.size && (pes = this._parsePES(aacData))) {
           if (this._aacTrack.isAAC) {
@@ -6231,69 +6234,63 @@ var TSDemuxer = function () {
       }
     }
   }, {
+    key: 'pushAccessUnit',
+    value: function pushAccessUnit(avcSample, avcTrack) {
+      //build sample from PES
+      // Annex B to MP4 conversion to be done
+      if (avcSample.units.length) {
+        // only push AVC sample if keyframe already found in this fragment OR
+        //    keyframe found in last fragment (track.sps) AND
+        //        samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
+        this.fragStats.framesCount++;
+        if (avcSample.key === true || avcTrack.sps && (avcTrack.samples.length || this.contiguous)) {
+          if (avcSample.key) {
+            this.fragStats.keyFrames++;
+          }
+          //logger.log(`avcSample ${avcSample.units.length} ${avcSample.dts} ${avcSample.key}`);
+          avcTrack.samples.push(avcSample);
+          avcTrack.len += avcSample.units.length;
+          avcTrack.nbNalu += avcSample.units.units.length;
+        } else {
+          this.fragStats.dropped++;
+        }
+        if (!this.numSample && !avcSample.key) {
+          this.fragStats.notFirstKeyframe++;
+        }
+        this.numSample++;
+      }
+    }
+  }, {
     key: '_parseAVCPES',
-    value: function _parseAVCPES(pes) {
+    value: function _parseAVCPES(pes, last) {
       var _this2 = this;
 
       var track = this._avcTrack,
-          samples = track.samples,
           units = this._parseAVCNALu(pes.data),
-          units2 = [],
           debug = false,
-          key = false,
           spsfound = false,
-          length = 0,
           expGolombDecoder,
-          avcSample,
+          avcSample = this.avcSample,
           push,
           hlsConfig = this.config,
-          i;
+          i,
+          createAVCSample = function createAVCSample(key, pts, dts) {
+        return { key: key, pts: pts, dts: dts, units: { units: [], length: 0 } };
+      };
       // no NALu found
-      if (units.length === 0 && samples.length > 0) {
+      if (units.length === 0 && avcSample && avcSample.units.length > 0) {
         // append pes.data to previous NAL unit
-        var lastavcSample = samples[samples.length - 1];
-        var lastUnit = lastavcSample.units.units[lastavcSample.units.units.length - 1];
+        var lastUnit = avcSample.units.units[avcSample.units.units.length - 1];
         var tmp = new Uint8Array(lastUnit.data.byteLength + pes.data.byteLength);
         tmp.set(lastUnit.data, 0);
         tmp.set(pes.data, lastUnit.data.byteLength);
         lastUnit.data = tmp;
-        lastavcSample.units.length += pes.data.byteLength;
+        avcSample.units.length += pes.data.byteLength;
         track.len += pes.data.byteLength;
       }
       //free pes.data to save up some memory
       pes.data = null;
       var debugString = '';
-
-      var pushAccessUnit = function pushAccessUnit() {
-        //build sample from PES
-        // Annex B to MP4 conversion to be done
-        if (units2.length) {
-          // only push AVC sample if keyframe already found in this fragment OR
-          //    keyframe found in last fragment (track.sps) AND
-          //        samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
-          this.fragStats.framesCount++;
-          if (key === true || track.sps && (samples.length || this.contiguous)) {
-            avcSample = { units: { units: units2, length: length }, pts: pes.pts, dts: pes.dts, key: key };
-            if (key) {
-              this.fragStats.keyFrames++;
-            }
-            //logger.log(`avcSample ${units2.length} ${length} ${pes.dts} ${key}`);
-            samples.push(avcSample);
-            track.len += length;
-            track.nbNalu += units2.length;
-          } else {
-            this.fragStats.dropped++;
-          }
-          if (!this.numSample && !key) {
-            this.fragStats.notFirstKeyframe++;
-          }
-          this.numSample++;
-          units2 = [];
-          length = 0;
-        }
-      };
-      pushAccessUnit = pushAccessUnit.bind(this);
-
       var _addKey = function _addKey(type) {
         var map = _this2.fragStats.keymap;
         var lastPos = -1;
@@ -6308,6 +6305,13 @@ var TSDemuxer = function () {
           map[type].push({ offset: _this2.lastAVCFrameStart, sn: _this2.numSample });
         }
       };
+
+      if (!avcSample || avcSample.pts !== pes.pts || avcSample.dts !== pes.dts) {
+        if (avcSample) {
+          this.pushAccessUnit(avcSample, track);
+        }
+        avcSample = this.avcSample = createAVCSample(false, pes.pts, pes.dts);
+      }
 
       units.forEach(function (unit) {
         switch (unit.type) {
@@ -6328,7 +6332,7 @@ var TSDemuxer = function () {
               // I slice: A slice that is not an SI slice that is decoded using intra prediction only.
               //if (sliceType === 2 || sliceType === 7) {
               if (sliceType === 2 || sliceType === 4 || sliceType === 7 || sliceType === 9) {
-                key = true;
+                avcSample.key = true;
                 _addKey('indr');
               }
             }
@@ -6339,7 +6343,7 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'IDR ';
             }
-            key = true;
+            avcSample.key = true;
             _addKey('idr');
             break;
           //SEI
@@ -6373,7 +6377,7 @@ var TSDemuxer = function () {
 
               // if SEI recovery_point has been found mark as keyframe
               if (!hlsConfig.disableSEIkeyframes && payloadType === 6) {
-                key = true;
+                avcSample.key = true;
                 _addKey('sei');
               }
 
@@ -6463,7 +6467,8 @@ var TSDemuxer = function () {
             if (debug) {
               debugString += 'AUD ';
             }
-            pushAccessUnit();
+            _this2.pushAccessUnit(avcSample, track);
+            avcSample = _this2.avcSample = createAVCSample(false, pes.pts, pes.dts);
             break;
           // Filler Data
           case 12:
@@ -6475,18 +6480,26 @@ var TSDemuxer = function () {
             break;
         }
         if (push) {
-          units2.push(unit);
-          length += unit.data.byteLength;
+          avcSample.units.units.push(unit);
+          avcSample.units.length += unit.data.byteLength;
         }
       });
       if (debug || debugString.length) {
         _logger.logger.log(debugString);
       }
-      if (key && this.levelParams[this.lastLevel]) {
+      if (avcSample.key && this.levelParams[this.lastLevel]) {
         track.sps = track.sps || this.levelParams[this.lastLevel].sps || undefined;
         track.pps = track.pps || this.levelParams[this.lastLevel].pps || undefined;
       }
-      pushAccessUnit();
+      if (avcSample) {
+        if (last) {
+          // if last PES packet, push samples
+          this.pushAccessUnit(avcSample, track);
+        }
+        if (last || avcSample.units.length === 0) {
+          this.avcSample = null;
+        }
+      }
     }
   }, {
     key: '_insertSampleInOrder',
@@ -6514,7 +6527,8 @@ var TSDemuxer = function () {
           len = array.byteLength,
           value,
           overflow,
-          state = this.avcNaluState;
+          state = this.avcNaluState,
+          track = this._avcTrack;
       var units = [],
           unit,
           unitType,
@@ -6557,17 +6571,15 @@ var TSDemuxer = function () {
                 if (lastState && i <= 4 - lastState) {
                   // start delimiter overlapping between PES packets
                   // strip start delimiter bytes from the end of last NAL unit
-                  var track = this._avcTrack,
-                      samples = track.samples;
-                  if (samples.length) {
-                    var lastavcSample = samples[samples.length - 1],
-                        lastUnits = lastavcSample.units.units,
-                        lastUnit = lastUnits[lastUnits.length - 1];
+                  var avcSample = this.avcSample;
+                  if (avcSample) {
+                    var _units = avcSample.units.units;
+                    var lastUnit = _units[_units.length - 1];
                     // check if lastUnit had a state different from zero
                     if (lastUnit.state) {
                       // strip last bytes
                       lastUnit.data = lastUnit.data.subarray(0, lastUnit.data.byteLength - lastState);
-                      lastavcSample.units.length -= lastState;
+                      avcSample.units.length -= lastState;
                       track.len -= lastState;
                     }
                   }
@@ -6575,19 +6587,17 @@ var TSDemuxer = function () {
                 // If NAL units are not starting right at the beginning of the PES packet, push preceding data into previous NAL unit.
                 overflow = i - state - 1;
                 if (overflow > 0) {
-                  var _track = this._avcTrack,
-                      _samples = _track.samples;
                   //logger.log('first NALU found with overflow:' + overflow);
-                  if (_samples.length) {
-                    var _lastavcSample = _samples[_samples.length - 1],
-                        _lastUnits = _lastavcSample.units.units,
-                        _lastUnit = _lastUnits[_lastUnits.length - 1],
+                  var _avcSample = this.avcSample;
+                  if (_avcSample) {
+                    var _units2 = _avcSample.units.units,
+                        _lastUnit = _units2[_units2.length - 1],
                         tmp = new Uint8Array(_lastUnit.data.byteLength + overflow);
                     tmp.set(_lastUnit.data, 0);
                     tmp.set(array.subarray(0, overflow), _lastUnit.data.byteLength);
                     _lastUnit.data = tmp;
-                    _lastavcSample.units.length += overflow;
-                    _track.len += overflow;
+                    _avcSample.units.length += overflow;
+                    track.len += overflow;
                   }
                 }
               }
@@ -7629,7 +7639,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-197';
+      return '0.6.1-198';
     }
   }, {
     key: 'Events',
