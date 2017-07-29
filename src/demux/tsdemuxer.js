@@ -716,7 +716,6 @@
       tmp.set(pes.data, lastUnit.data.byteLength);
       lastUnit.data = tmp;
       avcSample.units.length += pes.data.byteLength;
-      track.len += pes.data.byteLength;
     }
     //free pes.data to save up some memory
     pes.data = null;

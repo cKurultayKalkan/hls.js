@@ -6286,7 +6286,6 @@ var TSDemuxer = function () {
         tmp.set(pes.data, lastUnit.data.byteLength);
         lastUnit.data = tmp;
         avcSample.units.length += pes.data.byteLength;
-        track.len += pes.data.byteLength;
       }
       //free pes.data to save up some memory
       pes.data = null;
@@ -7639,7 +7638,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-198';
+      return '0.6.1-199';
     }
   }, {
     key: 'Events',
