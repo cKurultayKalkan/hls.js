@@ -6526,8 +6526,7 @@ var TSDemuxer = function () {
           len = array.byteLength,
           value,
           overflow,
-          state = this.avcNaluState,
-          track = this._avcTrack;
+          state = this.avcNaluState;
       var units = [],
           unit,
           unitType,
@@ -6579,7 +6578,6 @@ var TSDemuxer = function () {
                       // strip last bytes
                       lastUnit.data = lastUnit.data.subarray(0, lastUnit.data.byteLength - lastState);
                       avcSample.units.length -= lastState;
-                      track.len -= lastState;
                     }
                   }
                 }
@@ -6596,7 +6594,6 @@ var TSDemuxer = function () {
                     tmp.set(array.subarray(0, overflow), _lastUnit.data.byteLength);
                     _lastUnit.data = tmp;
                     _avcSample.units.length += overflow;
-                    track.len += overflow;
                   }
                 }
               }
@@ -7638,7 +7635,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-199';
+      return '0.6.1-200';
     }
   }, {
     key: 'Events',

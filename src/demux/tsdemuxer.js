@@ -954,7 +954,7 @@
   }
 
   _parseAVCNALu(array) {
-    var i = 0, len = array.byteLength, value, overflow, state = this.avcNaluState, track = this._avcTrack;
+    var i = 0, len = array.byteLength, value, overflow, state = this.avcNaluState;
     var units = [], unit, unitType, lastUnitStart, lastUnitType;
     //logger.log('PES:' + Hex.hexDump(array));
     while (i < len) {
@@ -1002,7 +1002,6 @@
                     // strip last bytes
                     lastUnit.data = lastUnit.data.subarray(0, lastUnit.data.byteLength - lastState);
                     avcSample.units.length -= lastState;
-                    track.len -= lastState;
                   }
                 }
               }
@@ -1019,7 +1018,6 @@
                   tmp.set(array.subarray(0, overflow), lastUnit.data.byteLength);
                   lastUnit.data = tmp;
                   avcSample.units.length += overflow;
-                  track.len += overflow;
                 }
               }
             }
