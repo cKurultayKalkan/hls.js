@@ -2299,9 +2299,12 @@ var StreamController = function (_EventHandler) {
       // in case of live playlist we need to ensure that requested position is not located before playlist start
       if (levelDetails.live) {
         frag = this._ensureFragmentAtLivePoint({ levelDetails: levelDetails, bufferEnd: bufferEnd, start: start, end: end, fragPrevious: fragPrevious, fragments: fragments, fragLen: fragLen });
+        var currentTime = this.media.currentTime;
         // if it explicitely returns null don't load any fragment and exit function now
         if (frag === null) {
           return false;
+        } else if (frag === undefined && this.loadedmetadata && pos !== currentTime && currentTime > bufferEnd) {
+          pos = bufferEnd = currentTime;
         }
       } else {
         // VoD playlist: if bufferEnd before start of playlist, load first fragment
@@ -2445,7 +2448,7 @@ var StreamController = function (_EventHandler) {
         var prevFrag = fragments[curSNIdx - 1];
         var nextFrag = fragments[curSNIdx + 1];
         _logger.logger.log('find SN matching with pos:' + bufferEnd + ':' + frag.sn);
-        var ignoreBacktrack = !frag.backtracked || frag.backtracked && (!frag.dropped && !nextFrag || frag.lastGop && bufferEnd >= frag.lastGop || fragPrevious && prevFrag && fragPrevious.level === prevFrag.level && fragPrevious.sn === prevFrag.sn);
+        var ignoreBacktrack = !frag.backtracked || !prevFrag || frag.backtracked && (!frag.dropped && !nextFrag || frag.lastGop && bufferEnd >= frag.lastGop || fragPrevious && prevFrag && fragPrevious.level === prevFrag.level && fragPrevious.sn === prevFrag.sn);
         if (ignoreBacktrack && fragPrevious && frag.sn === fragPrevious.sn) {
           if (frag.sn < levelDetails.endSN) {
             var deltaPTS = fragPrevious.deltaPTS;
@@ -2779,7 +2782,7 @@ var StreamController = function (_EventHandler) {
         if (bufferInfo.len === 0 && fragCurrent) {
           var fragPrevious = this.fragPrevious,
               checkPrevious = fragPrevious && fragCurrent.sn - fragPrevious.sn === 1,
-              fragStartOffset = checkPrevious ? fragPrevious.start : fragCurrent.start,
+              fragStartOffset = checkPrevious ? fragPrevious.start : fragCurrent.start - this.config.maxFragLookUpTolerance,
               fragEndOffset = fragStartOffset + (checkPrevious ? fragPrevious.duration : 0) + fragCurrent.duration;
           // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
           if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
@@ -7635,7 +7638,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-200';
+      return '0.6.1-201';
     }
   }, {
     key: 'Events',

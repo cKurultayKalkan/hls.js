@@ -306,9 +306,12 @@ class StreamController extends EventHandler {
     // in case of live playlist we need to ensure that requested position is not located before playlist start
     if (levelDetails.live) {
       frag = this._ensureFragmentAtLivePoint({levelDetails, bufferEnd, start, end, fragPrevious, fragments, fragLen});
+      let currentTime = this.media.currentTime;
       // if it explicitely returns null don't load any fragment and exit function now
       if (frag === null) {
         return false;
+      } else if (frag === undefined && this.loadedmetadata && pos !== currentTime && currentTime > bufferEnd) {
+        pos = bufferEnd = currentTime;
       }
 
     } else {
@@ -433,7 +436,7 @@ class StreamController extends EventHandler {
       const prevFrag = fragments[curSNIdx - 1];
       const nextFrag = fragments[curSNIdx + 1];
       logger.log('find SN matching with pos:' +  bufferEnd + ':' + frag.sn);
-      let ignoreBacktrack = !frag.backtracked || frag.backtracked && (!frag.dropped && !nextFrag || frag.lastGop && bufferEnd >= frag.lastGop ||
+      let ignoreBacktrack = !frag.backtracked || !prevFrag || frag.backtracked && (!frag.dropped && !nextFrag || frag.lastGop && bufferEnd >= frag.lastGop ||
             fragPrevious && prevFrag && fragPrevious.level === prevFrag.level && fragPrevious.sn === prevFrag.sn);
       if (ignoreBacktrack && fragPrevious && frag.sn === fragPrevious.sn) {
         if (frag.sn < levelDetails.endSN) {
@@ -786,7 +789,7 @@ class StreamController extends EventHandler {
       if (bufferInfo.len === 0 && fragCurrent) {
         let fragPrevious = this.fragPrevious,
           checkPrevious = fragPrevious && fragCurrent.sn - fragPrevious.sn === 1,
-          fragStartOffset = checkPrevious ? fragPrevious.start : fragCurrent.start,
+          fragStartOffset = checkPrevious ? fragPrevious.start : fragCurrent.start - this.config.maxFragLookUpTolerance,
           fragEndOffset = fragStartOffset + (checkPrevious ? fragPrevious.duration : 0) + fragCurrent.duration;
         // check if we seek position will be out of currently loaded frag range : if out cancel frag load, if in, don't do anything
         if (currentTime < fragStartOffset || currentTime > fragEndOffset) {
