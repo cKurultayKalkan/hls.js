@@ -445,7 +445,7 @@ class StreamController extends EventHandler {
           // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
           // let's try to load previous fragment again to get last keyframe
           // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
-          if (this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !BufferHelper.isBuffered(media, bufferEnd))) {
+          if (prevFrag && this.loadedmetadata && deltaPTS && deltaPTS > config.maxBufferHole && fragPrevious.dropped && (!media || !BufferHelper.isBuffered(media, bufferEnd))) {
             frag = prevFrag;
             logger.warn(`SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this`);
             // decrement previous frag load counter to avoid frag loop loading error when next fragment will get reloaded

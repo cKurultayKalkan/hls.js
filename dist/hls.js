@@ -2456,7 +2456,7 @@ var StreamController = function (_EventHandler) {
             // and if previous remuxed fragment did not start with a keyframe. (fragPrevious.dropped)
             // let's try to load previous fragment again to get last keyframe
             // then we will reload again current fragment (that way we should be able to fill the buffer hole ...)
-            if (this.loadedmetadata && deltaPTS && deltaPTS > config.maxSeekHole && fragPrevious.dropped && (!media || !_bufferHelper2.default.isBuffered(media, bufferEnd))) {
+            if (prevFrag && this.loadedmetadata && deltaPTS && deltaPTS > config.maxBufferHole && fragPrevious.dropped && (!media || !_bufferHelper2.default.isBuffered(media, bufferEnd))) {
               frag = prevFrag;
               _logger.logger.warn('SN just loaded, with large PTS gap between audio and video, maybe frag is not starting with a keyframe ? load previous one to try to overcome this');
               // decrement previous frag load counter to avoid frag loop loading error when next fragment will get reloaded
@@ -7638,7 +7638,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-201';
+      return '0.6.1-202';
     }
   }, {
     key: 'Events',
