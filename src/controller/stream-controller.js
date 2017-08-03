@@ -192,7 +192,8 @@ class StreamController extends EventHandler {
         break;
       case State.FRAG_LOADING:
         try {
-          var fragCurrent = this.fragCurrent, details = this.levels[this.level].details;
+          var fragCurrent = this.fragCurrent,
+              details = this.levelLastLoaded !== undefined && this.levels[this.levelLastLoaded] && this.levels[this.levelLastLoaded].details;
           if (details.live && (fragCurrent.sn<details.startSN || fragCurrent.sn>details.endSN)) {
             logger.log(`live playlist slided forward loading segments: reload`);
             this.state = State.IDLE;

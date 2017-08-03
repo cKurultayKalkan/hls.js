@@ -2178,7 +2178,7 @@ var StreamController = function (_EventHandler) {
         case State.FRAG_LOADING:
           try {
             var fragCurrent = this.fragCurrent,
-                details = this.levels[this.level].details;
+                details = this.levelLastLoaded !== undefined && this.levels[this.levelLastLoaded] && this.levels[this.levelLastLoaded].details;
             if (details.live && (fragCurrent.sn < details.startSN || fragCurrent.sn > details.endSN)) {
               _logger.logger.log('live playlist slided forward loading segments: reload');
               this.state = State.IDLE;
@@ -7638,7 +7638,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-202';
+      return '0.6.1-203';
     }
   }, {
     key: 'Events',
