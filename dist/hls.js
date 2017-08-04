@@ -3184,36 +3184,40 @@ var StreamController = function (_EventHandler) {
         this.stats.tparsed = performance.now();
         this.state = State.PARSED;
         _logger.logger.log('parsed frag sn:' + frag.sn + ',PTS:[' + (data.startPTS ? data.startPTS.toFixed(3) : 'none') + ',' + (data.endPTS ? data.endPTS.toFixed(3) : 'none') + '],lastGopPTS:' + (data.lastGopPTS ? data.lastGopPTS.toFixed(3) : 'none'));
-        if (data.startPTS !== undefined && data.endPTS !== undefined) {
-          var drift = _levelHelper2.default.updateFragPTS(details, frag.sn, data.startPTS, data.endPTS, data.lastGopPTS);
-          this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: details, level: frag.level, drift: drift });
-        } else {
-          // forse reload of prev fragment if video samples not found
-          frag.dropped = 1;
-          frag.deltaPTS = this.config.maxSeekHole + 1;
-        }
-        var curSNIdx = frag.sn - details.startSN;
-        if (curSNIdx >= 0) {
-          var detFrag = details.fragments[curSNIdx];
-          detFrag.loadCounter = frag.loadCounter;
-          var sameLevel = fragPrevious && frag.level === fragPrevious.level;
-          if (!this.config.disableBacktrack && !data.isPartial && !sameLevel) {
-            if (frag.dropped) {
-              detFrag.dropped = frag.dropped;
-              if (!detFrag.backtracked) {
-                // Causes findFragments to backtrack a segment and find the keyframe
-                // Audio fragments arriving before video sets the nextLoadPosition, causing _findFragments to skip the backtracked fragment
-                frag.backtracked = detFrag.backtracked = true;
-                this.nextLoadPosition = data.startPTS;
+        if (details) {
+          if (data.startPTS !== undefined && data.endPTS !== undefined) {
+            var drift = _levelHelper2.default.updateFragPTS(details, frag.sn, data.startPTS, data.endPTS, data.lastGopPTS);
+            this.hls.trigger(_events2.default.LEVEL_PTS_UPDATED, { details: details, level: frag.level, drift: drift });
+          } else {
+            // forse reload of prev fragment if video samples not found
+            frag.dropped = 1;
+            frag.deltaPTS = this.config.maxSeekHole + 1;
+          }
+          var curSNIdx = frag.sn - details.startSN;
+          if (curSNIdx >= 0) {
+            var detFrag = details.fragments[curSNIdx];
+            detFrag.loadCounter = frag.loadCounter;
+            var sameLevel = fragPrevious && frag.level === fragPrevious.level;
+            if (!this.config.disableBacktrack && !data.isPartial && !sameLevel) {
+              if (frag.dropped) {
+                detFrag.dropped = frag.dropped;
+                if (!detFrag.backtracked) {
+                  // Causes findFragments to backtrack a segment and find the keyframe
+                  // Audio fragments arriving before video sets the nextLoadPosition, causing _findFragments to skip the backtracked fragment
+                  frag.backtracked = detFrag.backtracked = true;
+                  this.nextLoadPosition = data.startPTS;
+                } else {
+                  _logger.logger.log('Already backtracked on this fragment, appending with the gap');
+                }
               } else {
-                _logger.logger.log('Already backtracked on this fragment, appending with the gap');
+                // Only reset the backtracked flag if we've loaded the frag without any dropped frames
+                frag.backtracked = detFrag.backtracked = false;
+                frag.forceQid = detFrag.forceQid = false;
               }
-            } else {
-              // Only reset the backtracked flag if we've loaded the frag without any dropped frames
-              frag.backtracked = detFrag.backtracked = false;
-              frag.forceQid = detFrag.forceQid = false;
             }
           }
+        } else {
+          _logger.logger.log('level ' + frag.level + ' details not found');
         }
         this.hls.trigger(_events2.default.FRAG_APPENDING);
       }
@@ -7638,7 +7642,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-204';
+      return '0.6.1-205';
     }
   }, {
     key: 'Events',
