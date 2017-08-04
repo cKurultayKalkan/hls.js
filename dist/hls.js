@@ -2378,7 +2378,7 @@ var StreamController = function (_EventHandler) {
           /* we have no idea about which fragment should be loaded.
              so let's load mid fragment. it will help computing playlist sliding and find the right one
           */
-          frag = fragments[Math.min(fragLen - 1, Math.round(fragLen / 2))];
+          frag = fragments[Math.min(fragLen - 1, Math.round((fragLen - 1) / 2))];
           _logger.logger.log('live playlist, switching playlist, unknown, load middle frag : ' + frag.sn);
         }
       }
@@ -7638,7 +7638,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-203';
+      return '0.6.1-204';
     }
   }, {
     key: 'Events',
