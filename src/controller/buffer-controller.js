@@ -91,6 +91,7 @@ class BufferController extends EventHandler {
       let url = URL.createObjectURL(ms);
       logger.log(`set object url ${url}`);
       media.src = url;
+      this.sbAppend = 0;
     }
   }
 
@@ -200,7 +201,7 @@ class BufferController extends EventHandler {
     }
   }
 
-  onSBUpdateEnd() {
+  onSBUpdateEnd(event) {
     // update timestampOffset
     if (this.audioTimestampOffset) {
       let audioBuffer = this.sourceBuffer.audio;
@@ -219,7 +220,11 @@ class BufferController extends EventHandler {
       this.onBufferEos();
     }
 
-    logger.log('sb updateend');
+    if (event){
+      this.sbAppend--;
+    }
+
+    logger.log(`sb updateend ${event ? event.target===this.sourceBuffer.audio ? 'audio' : event.target===this.sourceBuffer.video ? 'video' : 'unknown sb' : 'unknown'} ${this.sbAppend}`);
 
     this.updateMediaElementDuration();
 
@@ -347,6 +352,7 @@ class BufferController extends EventHandler {
     }
     if (!((sb.audio && sb.audio.updating) || (sb.video && sb.video.updating))) {
       logger.log('all media data available, signal endOfStream() to MediaSource and stop loading fragment');
+      logger.log(`append/updateend count ${this.sbAppend}`);
       //Notify the media element that it now has all of the media data
       mediaSource.endOfStream();
       this._needsEos = false;
@@ -475,12 +481,13 @@ class BufferController extends EventHandler {
         var segment = segments.shift();
         this.dumpSegment(segment);
         try {
-          logger.log(`appending ${segment.type} SB, size:${segment.data.length}`);
+          logger.log(`appending ${segment.type} SB, size:${segment.data.length} ${this.sbAppend}`);
           if(sourceBuffer[segment.type]) {
             this.lastSegment = segment;
             sourceBuffer[segment.type].appendBuffer(segment.data);
             this.appendError = 0;
             this.appended++;
+            this.sbAppend++;
           } else {
             // in case we don't have any source buffer matching with this segment type,
             // it means that Mediasource fails to create sourcebuffer

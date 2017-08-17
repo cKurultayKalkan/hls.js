@@ -744,6 +744,7 @@ var BufferController = function (_EventHandler) {
         var url = URL.createObjectURL(ms);
         _logger.logger.log('set object url ' + url);
         media.src = url;
+        this.sbAppend = 0;
       }
     }
   }, {
@@ -866,7 +867,7 @@ var BufferController = function (_EventHandler) {
     }
   }, {
     key: 'onSBUpdateEnd',
-    value: function onSBUpdateEnd() {
+    value: function onSBUpdateEnd(event) {
       // update timestampOffset
       if (this.audioTimestampOffset) {
         var audioBuffer = this.sourceBuffer.audio;
@@ -885,7 +886,11 @@ var BufferController = function (_EventHandler) {
         this.onBufferEos();
       }
 
-      _logger.logger.log('sb updateend');
+      if (event) {
+        this.sbAppend--;
+      }
+
+      _logger.logger.log('sb updateend ' + (event ? event.target === this.sourceBuffer.audio ? 'audio' : event.target === this.sourceBuffer.video ? 'video' : 'unknown sb' : 'unknown') + ' ' + this.sbAppend);
 
       this.updateMediaElementDuration();
 
@@ -1022,6 +1027,7 @@ var BufferController = function (_EventHandler) {
       }
       if (!(sb.audio && sb.audio.updating || sb.video && sb.video.updating)) {
         _logger.logger.log('all media data available, signal endOfStream() to MediaSource and stop loading fragment');
+        _logger.logger.log('append/updateend count ' + this.sbAppend);
         //Notify the media element that it now has all of the media data
         mediaSource.endOfStream();
         this._needsEos = false;
@@ -1162,12 +1168,13 @@ var BufferController = function (_EventHandler) {
           var segment = segments.shift();
           this.dumpSegment(segment);
           try {
-            _logger.logger.log('appending ' + segment.type + ' SB, size:' + segment.data.length);
+            _logger.logger.log('appending ' + segment.type + ' SB, size:' + segment.data.length + ' ' + this.sbAppend);
             if (sourceBuffer[segment.type]) {
               this.lastSegment = segment;
               sourceBuffer[segment.type].appendBuffer(segment.data);
               this.appendError = 0;
               this.appended++;
+              this.sbAppend++;
             } else {
               // in case we don't have any source buffer matching with this segment type,
               // it means that Mediasource fails to create sourcebuffer
@@ -7642,7 +7649,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-206';
+      return '0.6.1-207';
     }
   }, {
     key: 'Events',
@@ -7685,6 +7692,7 @@ var Hls = function () {
           enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
           enableSmoothStreaming: true,
+          enableDropContiguous: true,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
           manifestLoadingRetryDelay: 1000,
@@ -8911,8 +8919,7 @@ var MP4 = function () {
     key: 'mfhd',
     value: function mfhd(sequenceNumber) {
       return MP4.box(MP4.types.mfhd, new Uint8Array([0x00, 0x00, 0x00, 0x00, // flags
-      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]) // sequence_number
-      );
+      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]));
     }
   }, {
     key: 'minf',
@@ -9157,8 +9164,7 @@ var MP4 = function () {
       var lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
       return MP4.box(MP4.types.traf, MP4.box(MP4.types.tfhd, new Uint8Array([0x00, // version 0
       0x00, 0x00, 0x00, // flags
-      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF]) // track_ID
-      ), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
+      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF])), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
       0x00, 0x00, 0x00, // flags
       upperWordBaseMediaDecodeTime >>> 24 & 0xFF, upperWordBaseMediaDecodeTime >>> 16 & 0xFF, upperWordBaseMediaDecodeTime >>> 8 & 0xFF, upperWordBaseMediaDecodeTime & 0xFF, lowerWordBaseMediaDecodeTime >>> 24 & 0xFF, lowerWordBaseMediaDecodeTime >>> 16 & 0xFF, lowerWordBaseMediaDecodeTime >>> 8 & 0xFF, lowerWordBaseMediaDecodeTime & 0xFF])), MP4.trun(track, sampleDependencyTable.length + 16 + // tfhd
       20 + // tfdt
@@ -9463,7 +9469,7 @@ var MP4Remuxer = function () {
       var isSafari = config.browser.isSafari;
 
       // if parsed fragment is contiguous with last one, let's use last DTS value as reference
-      contiguous |= inputSamples.length && this.nextAvcDts && accurate && !stats.dropped && (Math.abs(timeOffset - nextAvcDts / timeScale) < 0.1 || Math.abs(inputSamples[0].dts - nextAvcDts - initDTS) < timeScale / 5);
+      contiguous |= inputSamples.length && this.nextAvcDts && accurate && (!stats.dropped || config.enableDropContiguous) && (Math.abs(timeOffset - nextAvcDts / timeScale) < 0.1 || Math.abs(inputSamples[0].dts - nextAvcDts - initDTS) < timeScale / 5);
 
       if (!contiguous) {
         // if not contiguous, let's use target timeOffset

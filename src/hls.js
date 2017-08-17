@@ -86,6 +86,7 @@ class Hls {
           enableWorker: !Hls.isIe(),
           enableSoftwareAES: true,
           enableSmoothStreaming: true,
+          enableDropContiguous: true,
           manifestLoadingTimeOut: 20000,
           manifestLoadingMaxRetry: 4,
           manifestLoadingRetryDelay: 1000,
