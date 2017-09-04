@@ -322,7 +322,7 @@ class StreamController extends EventHandler {
       }
     }
     if (!frag) {
-      frag = this._findFragment({start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails});
+      frag = this._findFragment({start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails, fetch: true});
     }
     if(frag) {
       return this._loadFragmentOrKey({frag, level, levelDetails, pos, bufferEnd});
@@ -384,7 +384,7 @@ class StreamController extends EventHandler {
     return frag;
   }
 
-  _findFragment({start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails, holaSeek}) {
+  _findFragment({start, fragPrevious, fragLen, fragments, bufferEnd, end, levelDetails, holaSeek, fetch}) {
     const config = this.hls.config;
     let frag,
         foundFrag,
@@ -478,7 +478,9 @@ class StreamController extends EventHandler {
           // If a fragment has dropped frames and it's in a different level/sequence, load the previous fragment to try and find the keyframe
           // Reset the dropped count now since it won't be reset until we parse the fragment again, which prevents infinite backtracking on the same segment
           logger.log('Loaded fragment with dropped frames, backtracking 1 segment to find a keyframe');
-          frag.dropped = 0;
+          if (fetch) {
+            frag.dropped = 0;
+          }
           if (prevFrag) {
             if (prevFrag.loadCounter) {
               prevFrag.loadCounter--;
