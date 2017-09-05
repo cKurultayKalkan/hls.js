@@ -1379,6 +1379,7 @@ class StreamController extends EventHandler {
           if(expectedPlaying) {
             // playhead not moving BUT media expected to play
             const tnow = performance.now();
+            let highBufPeriod = (!this.nudgeRetry && media.seeking ? 2 : 1) * config.highBufferWatchdogPeriod;
             if(!this.stalled) {
               // stall just detected, store current time
               this.stalled = tnow;
@@ -1416,7 +1417,7 @@ class StreamController extends EventHandler {
                   hls.trigger(Event.ERROR, {type: ErrorTypes.MEDIA_ERROR, details: ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole : nextBufferStart + nudgeOffset - currentTime});
                   hls.trigger(Event.BUF_STATISTICS, {bufSeekOverHole: {ts: currentTime}});
                 }
-              } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
+              } else if (bufferLen > jumpThreshold && stalledDuration > highBufPeriod * 1000) {
                 if (this.stallReported && this.stallLowBuf) {
                   // reset stalled so to rearm watchdog timer
                   this.stalled = undefined;

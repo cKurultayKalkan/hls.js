@@ -3409,6 +3409,7 @@ var StreamController = function (_EventHandler) {
             if (expectedPlaying) {
               // playhead not moving BUT media expected to play
               var tnow = performance.now();
+              var highBufPeriod = (!this.nudgeRetry && media.seeking ? 2 : 1) * config.highBufferWatchdogPeriod;
               if (!this.stalled) {
                 // stall just detected, store current time
                 this.stalled = tnow;
@@ -3445,7 +3446,7 @@ var StreamController = function (_EventHandler) {
                     hls.trigger(_events2.default.ERROR, { type: _errors.ErrorTypes.MEDIA_ERROR, details: _errors.ErrorDetails.BUFFER_SEEK_OVER_HOLE, fatal: false, hole: nextBufferStart + nudgeOffset - currentTime });
                     hls.trigger(_events2.default.BUF_STATISTICS, { bufSeekOverHole: { ts: currentTime } });
                   }
-                } else if (bufferLen > jumpThreshold && stalledDuration > config.highBufferWatchdogPeriod * 1000) {
+                } else if (bufferLen > jumpThreshold && stalledDuration > highBufPeriod * 1000) {
                   if (this.stallReported && this.stallLowBuf) {
                     // reset stalled so to rearm watchdog timer
                     this.stalled = undefined;
@@ -7652,7 +7653,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-208';
+      return '0.6.1-209';
     }
   }, {
     key: 'Events',
