@@ -2837,6 +2837,10 @@ var StreamController = function (_EventHandler) {
     value: function onMediaSeeked() {
       _logger.logger.log('media seeked to ' + this.media.currentTime);
       // tick to speed up FRAGMENT_PLAYING triggering
+      if (this.stalled && !this.nudgeRetry && !this.stallLowBuf) {
+        // reset stalled so to rearm watchdog timer
+        this.stalled = undefined;
+      }
       this.tick();
     }
   }, {
@@ -7653,7 +7657,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-209';
+      return '0.6.1-210';
     }
   }, {
     key: 'Events',

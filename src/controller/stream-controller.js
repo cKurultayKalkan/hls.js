@@ -836,6 +836,10 @@ class StreamController extends EventHandler {
   onMediaSeeked() {
     logger.log('media seeked to ' + this.media.currentTime);
     // tick to speed up FRAGMENT_PLAYING triggering
+    if (this.stalled && !this.nudgeRetry && !this.stallLowBuf) {
+      // reset stalled so to rearm watchdog timer
+      this.stalled = undefined;
+    }
     this.tick();
   }
 
