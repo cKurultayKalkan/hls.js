@@ -160,6 +160,14 @@ class MP4Remuxer {
     }
   }
 
+  contiguousTest(samples, dropped, timeOffset, accurate) {
+    return samples.length && this.nextAvcDts && accurate &&
+      (!dropped || this.config.enableDropContiguous) &&
+      (Math.abs(timeOffset-this.nextAvcDts/this.PES_TIMESCALE) < 0.1 ||
+      Math.abs((samples[0].dts-this.nextAvcDts-this._initDTS)) <
+        this.PES_TIMESCALE/5);
+  }
+
   remuxVideo(track, timeOffset, contiguous, accurate, audioTrackLength, audioStartPTS, flush, stats, isPartial) {
     var offset = 8,
         pes2mp4ScaleFactor = this.PES2MP4SCALEFACTOR,
@@ -180,8 +188,7 @@ class MP4Remuxer {
     const isSafari = config.browser.isSafari;
 
     // if parsed fragment is contiguous with last one, let's use last DTS value as reference
-    contiguous |= (inputSamples.length && this.nextAvcDts && accurate && (!stats.dropped || config.enableDropContiguous) &&
-        (Math.abs(timeOffset-nextAvcDts/timeScale) < 0.1 || Math.abs((inputSamples[0].dts-nextAvcDts-initDTS)) < timeScale/5));
+    contiguous |= this.contiguousTest(inputSamples, stats.dropped, timeOffset, accurate);
 
     if (!contiguous) {
       // if not contiguous, let's use target timeOffset

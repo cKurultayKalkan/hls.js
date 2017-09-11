@@ -381,7 +381,7 @@
   remux(data, final, flush, lastSegment, forceReinit) {
     var _saveAVCSamples = [], _saveAACSamples = [], _saveID3Samples = [],
         _saveTextSamples = [], maxk, samples = this._avcTrack.samples,
-        segStartDTS, segEndDTS, initDTS, reinit;
+        segStartDTS, segEndDTS, videoStartDTS, videoEndDTS, initDTS, reinit;
     let timescale = this.remuxer.PES_TIMESCALE;
     if (samples.length && final) {
       reinit = forceReinit || this.remuxer._initDTS === undefined ||
@@ -390,8 +390,9 @@
         Math.abs(this._aacTrack.samples.length &&
           this._aacTrack.samples[0].pts-this.remuxer.nextAacPts-
           this.remuxer._initDTS) > this.config.maxBufferHole*timescale;
-      initDTS = reinit ?
-        samples[0].dts-timescale * this.timeOffset : this.remuxer._initDTS;
+
+      initDTS = reinit ? Math.min(this._aacTrack.samples[0].pts, samples[0].dts)-timescale *
+          this.timeOffset : this.remuxer._initDTS;
       // if we have a big gap (>maxBufferHole) between adjacent segments, it
       // means we don't really have accurate segment timing and have to reinit
       // pts/dts offsets
@@ -400,14 +401,18 @@
         this.remuxer.switchLevel();
         this.remuxer.insertDiscontinuity();
       }
+      let guessContiguous = flush && !lastSegment ||
+        (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous) ||
+        this.remuxer.contiguousTest(samples, this.fragStats.dropped,
+          flush && this.nextStartPts ? this.nextStartPts : this.timeOffset, this.accurate);
       let startDTS = Math.max(this.remuxer._PTSNormalize(
         (this.gopStartDTS === undefined ? samples[0].dts : this.gopStartDTS)-
         initDTS,this.nextAvcDts),0);
-      let sample = samples[samples.length-1];
-      let videoStartDTS = Math.max(this.remuxer._PTSNormalize(
+      let sample = samples[samples.length-1], frameLength;
+      videoStartDTS = Math.max(this.remuxer._PTSNormalize(
         (this.fragStartDts === undefined ? samples[0].dts : this.fragStartDts)-
         initDTS, this.nextAvcDts),0)/timescale;
-      let videoEndDTS = Math.max(this.remuxer._PTSNormalize(sample.dts-initDTS,
+      videoEndDTS = Math.max(this.remuxer._PTSNormalize(sample.dts-initDTS,
         this.nextAvcDts),0)/timescale;
       if (this.accurate && Math.abs(startDTS-this.nextAvcDts)>90) {
         videoStartDTS -= (startDTS-this.nextAvcDts)/timescale;
@@ -418,11 +423,20 @@
           this.nextAvcDts);
         var sampleDts = this.remuxer._PTSNormalize(sample.dts,
           this.nextAvcDts);
-        videoEndDTS += (sampleDts - fragStartDts) / (samples.length+
-          this.remuxAVCCount - this.fragStartAVCPos - 1) / timescale;
+        frameLength = (sampleDts - fragStartDts) / (samples.length+
+          this.remuxAVCCount - this.fragStartAVCPos - 1);
+        videoEndDTS += frameLength / timescale;
       }
       segStartDTS = videoStartDTS;
       segEndDTS = videoEndDTS;
+      if (this.fragStats.dropped && frameLength) {
+        if (guessContiguous) {
+          videoEndDTS += frameLength*this.fragStats.dropped / timescale;
+        } else {
+          videoStartDTS -= frameLength*this.fragStats.dropped / timescale;
+        }
+      }
+
       if (this._aacTrack.audiosamplerate) {
         let expectedSampleDuration = 1024/this._aacTrack.audiosamplerate;
         let remuxAACCount = this._aacTrack.samples.length;
@@ -491,8 +505,8 @@
     if (final) {
       let lastGopPTS = Math.min(this.remuxer.nextAvcDts,
         this.remuxer.nextAacPts)/timescale;
-      this.observer.trigger(Event.FRAG_PARSED, {startPTS: segStartDTS,
-        endPTS: segEndDTS, lastGopPTS: lastGopPTS});
+      this.observer.trigger(Event.FRAG_PARSED, {startPTS: videoStartDTS,
+        endPTS: videoEndDTS, lastGopPTS: lastGopPTS});
     }
   }
 
