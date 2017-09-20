@@ -460,7 +460,8 @@
       // save samples and break by GOP
       for (maxk=samples.length-1; maxk>1; maxk--) {
         if (samples[maxk].key) {
-          if (maxk && (samples[maxk-1].dts-initDTS)/timescale < segStartDTS) {
+          let gopDTS = (samples[maxk-1].dts-initDTS)/timescale;
+          if (gopDTS < segStartDTS || gopDTS-videoStartDTS < (videoEndDTS-videoStartDTS)/3) {
             maxk = 0;
           }
           break;
