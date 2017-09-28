@@ -93,6 +93,7 @@ class Hls {
           levelLoadingTimeOut: 20000,
           levelLoadingMaxRetry: 4,
           levelLoadingRetryDelay: 1000,
+          levelLoadingMaxRetryTimeout: 64000,
           fragLoadingTimeOut: 20000,
           fragLoadingMaxRetry: 6,
           fragLoadingRetryDelay: 1000,
