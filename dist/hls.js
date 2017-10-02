@@ -2456,7 +2456,7 @@ var StreamController = function (_EventHandler) {
           seekFlag = media && media.seeking || holaSeek;
 
       if (bufferEnd < end - 0.05) {
-        if (bufferEnd > end - maxFragLookUpTolerance || seekFlag) {
+        if (bufferEnd > end - maxFragLookUpTolerance) {
           maxFragLookUpTolerance = 0;
         }
         foundFrag = _binarySearch2.default.search(fragments, function (candidate) {
@@ -2473,12 +2473,10 @@ var StreamController = function (_EventHandler) {
           // previous frag         matching fragment         next frag
           //  return -1             return 0                 return 1
           //logger.log(`level/sn/start/end/bufEnd:${level}/${candidate.sn}/${candidate.start}/${(candidate.start+candidate.duration)}/${bufferEnd}`);
-          // if we are in seek, the condition will always be false
-          if (candidate.lastGop - maxFragLookUpTolerance < bufferEnd && candidate.lastGop + maxFragLookUpTolerance > bufferEnd) {
+          if (!seekFlag && candidate.lastGop - maxFragLookUpTolerance < bufferEnd && candidate.lastGop + maxFragLookUpTolerance > bufferEnd) {
             return 1;
           }
-          // if we are in seek, the condition will always be false
-          if (candidate.firstGop - maxFragLookUpTolerance < bufferEnd && candidate.firstGop + maxFragLookUpTolerance > bufferEnd) {
+          if (!seekFlag && candidate.firstGop - maxFragLookUpTolerance < bufferEnd && candidate.firstGop + maxFragLookUpTolerance > bufferEnd) {
             return 0;
           }
           if (candidate.start + candidate.duration - maxFragLookUpTolerance <= bufferEnd) {
@@ -7716,7 +7714,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-213';
+      return '0.6.1-214';
     }
   }, {
     key: 'Events',
