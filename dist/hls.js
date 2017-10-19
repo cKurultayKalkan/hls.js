@@ -6031,9 +6031,9 @@ var TSDemuxer = function () {
           reinit;
       var timescale = this.remuxer.PES_TIMESCALE;
       if (samples.length && final) {
-        reinit = forceReinit || this.remuxer._initDTS === undefined || this.accurate && Math.abs(samples[0].dts - this.remuxer.nextAvcDts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale && Math.abs(this._aacTrack.samples.length && this._aacTrack.samples[0].pts - this.remuxer.nextAacPts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale;
+        reinit = forceReinit || this.remuxer._initDTS === undefined || this.accurate && Math.abs(samples[0].dts - this.remuxer.nextAvcDts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale && (!this._aacTrack.samples.length || Math.abs(this._aacTrack.samples[0].pts - this.remuxer.nextAacPts - this.remuxer._initDTS) > this.config.maxBufferHole * timescale);
 
-        initDTS = reinit ? Math.min(this._aacTrack.samples[0].pts, samples[0].dts) - timescale * this.timeOffset : this.remuxer._initDTS;
+        initDTS = reinit ? Math.min(this._aacTrack.samples.length ? this._aacTrack.samples[0].pts : Infinity, samples[0].dts) - timescale * this.timeOffset : this.remuxer._initDTS;
         // if we have a big gap (>maxBufferHole) between adjacent segments, it
         // means we don't really have accurate segment timing and have to reinit
         // pts/dts offsets
@@ -7714,7 +7714,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-214';
+      return '0.6.1-215';
     }
   }, {
     key: 'Events',
@@ -8985,8 +8985,7 @@ var MP4 = function () {
     key: 'mfhd',
     value: function mfhd(sequenceNumber) {
       return MP4.box(MP4.types.mfhd, new Uint8Array([0x00, 0x00, 0x00, 0x00, // flags
-      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]) // sequence_number
-      );
+      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]));
     }
   }, {
     key: 'minf',
@@ -9231,8 +9230,7 @@ var MP4 = function () {
       var lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
       return MP4.box(MP4.types.traf, MP4.box(MP4.types.tfhd, new Uint8Array([0x00, // version 0
       0x00, 0x00, 0x00, // flags
-      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF]) // track_ID
-      ), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
+      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF])), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
       0x00, 0x00, 0x00, // flags
       upperWordBaseMediaDecodeTime >>> 24 & 0xFF, upperWordBaseMediaDecodeTime >>> 16 & 0xFF, upperWordBaseMediaDecodeTime >>> 8 & 0xFF, upperWordBaseMediaDecodeTime & 0xFF, lowerWordBaseMediaDecodeTime >>> 24 & 0xFF, lowerWordBaseMediaDecodeTime >>> 16 & 0xFF, lowerWordBaseMediaDecodeTime >>> 8 & 0xFF, lowerWordBaseMediaDecodeTime & 0xFF])), MP4.trun(track, sampleDependencyTable.length + 16 + // tfhd
       20 + // tfdt

@@ -387,12 +387,11 @@
       reinit = forceReinit || this.remuxer._initDTS === undefined ||
         this.accurate && Math.abs(samples[0].dts-this.remuxer.nextAvcDts-
           this.remuxer._initDTS) > this.config.maxBufferHole*timescale &&
-        Math.abs(this._aacTrack.samples.length &&
-          this._aacTrack.samples[0].pts-this.remuxer.nextAacPts-
-          this.remuxer._initDTS) > this.config.maxBufferHole*timescale;
+        (!this._aacTrack.samples.length || Math.abs(this._aacTrack.samples[0].pts-
+          this.remuxer.nextAacPts-this.remuxer._initDTS) > this.config.maxBufferHole*timescale);
 
-      initDTS = reinit ? Math.min(this._aacTrack.samples[0].pts, samples[0].dts)-timescale *
-          this.timeOffset : this.remuxer._initDTS;
+      initDTS = reinit ? Math.min(this._aacTrack.samples.length ? this._aacTrack.samples[0].pts : Infinity,
+          samples[0].dts)-timescale * this.timeOffset : this.remuxer._initDTS;
       // if we have a big gap (>maxBufferHole) between adjacent segments, it
       // means we don't really have accurate segment timing and have to reinit
       // pts/dts offsets

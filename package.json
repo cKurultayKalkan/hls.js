@@ -1,6 +1,6 @@
 {
   "name": "@hola.org/hls.js",
-  "version": "0.6.1-214",
+  "version": "0.6.1-215",
   "license": "Apache-2.0",
   "description": "Media Source Extension - HLS library, by/for Dailymotion",
   "homepage": "https://github.com/hola/hls.js",
@@ -62,7 +62,7 @@
     "npm-run-all": "^3.1.2",
     "opener": "^1.4.0",
     "parallelshell": "^2.0.0",
-    "rimraf": "^2.5.1",
+    "rimraf": "^2.6.2",
     "uglify-js": "^2.8.29",
     "watchify": "^3.7.0"
   }
