@@ -6107,7 +6107,7 @@ var TSDemuxer = function () {
       if ((flush || final && !this.remuxAVCCount) && this._avcTrack.samples.length + this._aacTrack.samples.length || maxk > 0) {
         this.remuxAVCCount += this._avcTrack.samples.length;
         this.remuxAACCount += this._aacTrack.samples.length;
-        this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset, flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats, flush && !lastSegment);
+        this.remuxer.remux(this._aacTrack, this._avcTrack, this._id3Track, this._txtTrack, flush && this.nextStartPts ? this.nextStartPts : this.timeOffset, flush && !lastSegment || (this.lastContiguous !== undefined ? this.lastContiguous : this.contiguous), this.accurate, data, flush, this.fragStats, flush && !lastSegment, this.remuxAACCount - this.fragStartAACPos);
         this.lastContiguous = undefined;
         this.nextStartPts = this.remuxer.endPTS;
         this._avcTrack.samples = _saveAVCSamples;
@@ -7714,7 +7714,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-215';
+      return '0.6.1-216';
     }
   }, {
     key: 'Events',
@@ -8985,7 +8985,8 @@ var MP4 = function () {
     key: 'mfhd',
     value: function mfhd(sequenceNumber) {
       return MP4.box(MP4.types.mfhd, new Uint8Array([0x00, 0x00, 0x00, 0x00, // flags
-      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]));
+      sequenceNumber >> 24, sequenceNumber >> 16 & 0xFF, sequenceNumber >> 8 & 0xFF, sequenceNumber & 0xFF]) // sequence_number
+      );
     }
   }, {
     key: 'minf',
@@ -9230,7 +9231,8 @@ var MP4 = function () {
       var lowerWordBaseMediaDecodeTime = Math.floor(baseMediaDecodeTime % (UINT32_MAX + 1));
       return MP4.box(MP4.types.traf, MP4.box(MP4.types.tfhd, new Uint8Array([0x00, // version 0
       0x00, 0x00, 0x00, // flags
-      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF])), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
+      id >> 24, id >> 16 & 0XFF, id >> 8 & 0XFF, id & 0xFF]) // track_ID
+      ), MP4.box(MP4.types.tfdt, new Uint8Array([0x01, // version 1
       0x00, 0x00, 0x00, // flags
       upperWordBaseMediaDecodeTime >>> 24 & 0xFF, upperWordBaseMediaDecodeTime >>> 16 & 0xFF, upperWordBaseMediaDecodeTime >>> 8 & 0xFF, upperWordBaseMediaDecodeTime & 0xFF, lowerWordBaseMediaDecodeTime >>> 24 & 0xFF, lowerWordBaseMediaDecodeTime >>> 16 & 0xFF, lowerWordBaseMediaDecodeTime >>> 8 & 0xFF, lowerWordBaseMediaDecodeTime & 0xFF])), MP4.trun(track, sampleDependencyTable.length + 16 + // tfhd
       20 + // tfdt
@@ -9380,7 +9382,7 @@ var MP4Remuxer = function () {
     }
   }, {
     key: 'remux',
-    value: function remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurate, data, flush, stats, isPartial) {
+    value: function remux(audioTrack, videoTrack, id3Track, textTrack, timeOffset, contiguous, accurate, data, flush, stats, isPartial, remuxAACCount) {
       // dummy
       data = null;
 
@@ -9393,7 +9395,7 @@ var MP4Remuxer = function () {
         // Purposefully remuxing audio before video, so that remuxVideo can use nextAacPts, which is
         // calculated in remuxAudio.
         //logger.log('nb AAC samples:' + audioTrack.samples.length);
-        if (audioTrack.samples.length) {
+        if (audioTrack.samples.length && (remuxAACCount || remuxAACCount === undefined)) {
           var audioData = this.remuxAudio(audioTrack, timeOffset, contiguous, accurate, stats, isPartial);
           //logger.log('nb AVC samples:' + videoTrack.samples.length);
           if (videoTrack.samples.length) {
@@ -9997,17 +9999,11 @@ var MP4Remuxer = function () {
       var pesTimeScale = this.PES_TIMESCALE,
           mp4timeScale = track.timescale ? track.timescale : track.audiosamplerate,
           pes2mp4ScaleFactor = pesTimeScale / mp4timeScale,
-          startDTS = (contiguous ? this.nextAacPts : videoData.startDTS * pesTimeScale) + this._initDTS,
-          endDTS = videoData.endDTS * pesTimeScale + this._initDTS,
 
 
       // one sample's duration value
       sampleDuration = 1024,
           frameDuration = pes2mp4ScaleFactor * sampleDuration,
-
-
-      // samples count of this segment's duration
-      nbSamples = Math.ceil((endDTS - startDTS) / frameDuration),
 
 
       // silent frame
@@ -10020,13 +10016,18 @@ var MP4Remuxer = function () {
         return;
       }
 
-      var samples = [];
+      var samples = track.samples,
+          endDTS = videoData.endDTS * pesTimeScale + this._initDTS;
+      var startDTS = samples.length ? samples[samples.length - 1].dts + frameDuration : (contiguous ? this.nextAacPts : videoData.startDTS * pesTimeScale) + this._initDTS;
+
+      // samples count of this segment's duration
+      var nbSamples = Math.ceil((endDTS - startDTS) / frameDuration);
+
       for (var i = 0; i < nbSamples; i++) {
         var stamp = startDTS + i * frameDuration;
         samples.push({ unit: silentFrame.slice(0), pts: stamp, dts: stamp });
         track.len += silentFrame.length;
       }
-      track.samples = samples;
 
       this.remuxAudio(track, timeOffset, contiguous, undefined, stats, isPartial);
     }

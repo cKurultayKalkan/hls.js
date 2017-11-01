@@ -36,7 +36,7 @@ class MP4Remuxer {
     this.ISGenerated = false;
   }
 
-  remux(audioTrack,videoTrack,id3Track,textTrack,timeOffset, contiguous, accurate, data, flush, stats, isPartial) {
+  remux(audioTrack,videoTrack,id3Track,textTrack,timeOffset, contiguous, accurate, data, flush, stats, isPartial, remuxAACCount) {
     // dummy
     data = null;
 
@@ -49,7 +49,7 @@ class MP4Remuxer {
       // Purposefully remuxing audio before video, so that remuxVideo can use nextAacPts, which is
       // calculated in remuxAudio.
       //logger.log('nb AAC samples:' + audioTrack.samples.length);
-      if (audioTrack.samples.length) {
+      if (audioTrack.samples.length && (remuxAACCount || remuxAACCount===undefined)) {
         let audioData = this.remuxAudio(audioTrack,timeOffset,contiguous,accurate, stats, isPartial);
         //logger.log('nb AVC samples:' + videoTrack.samples.length);
         if (videoTrack.samples.length) {
@@ -637,15 +637,10 @@ class MP4Remuxer {
     let pesTimeScale = this.PES_TIMESCALE,
         mp4timeScale = track.timescale ? track.timescale : track.audiosamplerate,
         pes2mp4ScaleFactor = pesTimeScale/mp4timeScale,
-        startDTS = (contiguous ? this.nextAacPts : videoData.startDTS*pesTimeScale)+this._initDTS,
-        endDTS = videoData.endDTS * pesTimeScale + this._initDTS,
 
         // one sample's duration value
         sampleDuration = 1024,
         frameDuration = pes2mp4ScaleFactor * sampleDuration,
-
-        // samples count of this segment's duration
-        nbSamples = Math.ceil((endDTS-startDTS) / frameDuration),
 
         // silent frame
         silentFrame = AAC.getSilentFrame(track.channelCount);
@@ -657,13 +652,18 @@ class MP4Remuxer {
       return;
     }
 
-    let samples = [];
+    let samples = track.samples, endDTS = videoData.endDTS * pesTimeScale + this._initDTS;
+    let startDTS = samples.length ? (samples[samples.length - 1].dts + frameDuration) :
+        (contiguous ? this.nextAacPts : videoData.startDTS * pesTimeScale) + this._initDTS;
+
+    // samples count of this segment's duration
+    let nbSamples = Math.ceil((endDTS-startDTS) / frameDuration);
+
     for(var i = 0; i < nbSamples; i++) {
       var stamp = startDTS + i * frameDuration;
       samples.push({unit: silentFrame.slice(0), pts: stamp, dts: stamp});
       track.len += silentFrame.length;
     }
-    track.samples = samples;
 
     this.remuxAudio(track, timeOffset, contiguous, undefined, stats, isPartial);
   }

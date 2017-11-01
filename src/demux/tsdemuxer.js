@@ -489,7 +489,7 @@
           this.nextStartPts : this.timeOffset,
         flush && !lastSegment || (this.lastContiguous !== undefined ?
           this.lastContiguous : this.contiguous), this.accurate, data, flush,
-        this.fragStats, flush && !lastSegment);
+        this.fragStats, flush && !lastSegment, this.remuxAACCount-this.fragStartAACPos);
       this.lastContiguous = undefined;
       this.nextStartPts = this.remuxer.endPTS;
       this._avcTrack.samples = _saveAVCSamples;
