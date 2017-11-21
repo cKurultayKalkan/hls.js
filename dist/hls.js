@@ -6318,16 +6318,19 @@ var TSDemuxer = function () {
       //build sample from PES
       // Annex B to MP4 conversion to be done
       if (avcSample.units.length) {
+        var samples = avcTrack.samples;
+        var nbSamples = samples.length;
         // only push AVC sample if keyframe already found in this fragment OR
         //    keyframe found in last fragment (track.sps) AND
         //        samples already appended (we already found a keyframe in this fragment) OR fragment is contiguous
         this.fragStats.framesCount++;
-        if (avcSample.key === true || avcTrack.sps && (avcTrack.samples.length || this.contiguous)) {
+        if (avcSample.key === true || avcTrack.sps && (nbSamples || this.contiguous)) {
           if (avcSample.key) {
             this.fragStats.keyFrames++;
           }
           //logger.log(`avcSample ${avcSample.units.length} ${avcSample.dts} ${avcSample.key}`);
-          avcTrack.samples.push(avcSample);
+          avcSample.id = nbSamples;
+          samples.push(avcSample);
           avcTrack.len += avcSample.units.length;
           avcTrack.nbNalu += avcSample.units.units.length;
         } else {
@@ -7714,7 +7717,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-216';
+      return '0.6.1-217';
     }
   }, {
     key: 'Events',
