@@ -7721,7 +7721,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-218';
+      return '0.6.1-219';
     }
   }, {
     key: 'Events',
@@ -7748,7 +7748,7 @@ var Hls = function () {
           capLevelOnFPSDrop: false,
           capLevelToPlayerSize: false,
           maxBufferLength: 40,
-          maxStartBufferLength: 8,
+          maxStartBufferLength: 6,
           maxBufferSize: 60 * 1000 * 1000,
           maxBufferHole: 0.5,
           maxSeekHole: 2,
