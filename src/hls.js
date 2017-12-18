@@ -70,6 +70,7 @@ class Hls {
           capLevelOnFPSDrop: false,
           capLevelToPlayerSize: false,
           maxBufferLength: 40,
+          maxStartBufferLength: 8,
           maxBufferSize: 60 * 1000 * 1000,
           maxBufferHole: 0.5,
           maxSeekHole: 2,

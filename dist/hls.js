@@ -2272,18 +2272,19 @@ var StreamController = function (_EventHandler) {
     key: '_doTickIdle',
     value: function _doTickIdle() {
       var hls = this.hls,
-          config = hls.config;
+          config = hls.config,
+          media = this.media;
 
       // if video not attached AND
       // start fragment already requested OR start frag prefetch disable
       // exit loop
       // => if media not attached but start frag prefetch is enabled and start frag not requested yet, we will not exit loop
-      if (this.levelLastLoaded !== undefined && !this.media && (this.startFragRequested || !config.startFragPrefetch)) {
+      if (this.levelLastLoaded !== undefined && !media && (this.startFragRequested || !config.startFragPrefetch)) {
         return true;
       }
 
       // if we have not yet loaded any fragment, start loading from start position
-      var pos = this.loadedmetadata ? this.media.currentTime : this.nextLoadPosition;
+      var pos = this.loadedmetadata ? media.currentTime : this.nextLoadPosition;
       // determine next load level
       var level = hls.nextLoadLevel;
 
@@ -2295,11 +2296,14 @@ var StreamController = function (_EventHandler) {
       } else {
         maxBufLen = config.maxBufferLength;
       }
+      if (!config.disableStartBufReduce && this.loadedmetadata && pos < 2 && media.paused) {
+        maxBufLen = config.maxStartBufferLength;
+      }
 
       // determine next candidate fragment to be loaded, based on current position and end of buffer position
       // ensure up to `config.maxMaxBufferLength` of buffer upfront
 
-      var bufferInfo = _bufferHelper2.default.bufferInfo(this.media, pos, config.maxBufferHole),
+      var bufferInfo = _bufferHelper2.default.bufferInfo(media, pos, config.maxBufferHole),
           bufferLen = bufferInfo.len;
       // Stay idle if we are still with buffer margins
       if (bufferLen >= maxBufLen) {
@@ -7717,7 +7721,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-217';
+      return '0.6.1-218';
     }
   }, {
     key: 'Events',
@@ -7744,6 +7748,7 @@ var Hls = function () {
           capLevelOnFPSDrop: false,
           capLevelToPlayerSize: false,
           maxBufferLength: 40,
+          maxStartBufferLength: 8,
           maxBufferSize: 60 * 1000 * 1000,
           maxBufferHole: 0.5,
           maxSeekHole: 2,

@@ -233,19 +233,20 @@ class StreamController extends EventHandler {
   //       played segment, or on pause/play/seek instead of naively checking every 100ms?
   _doTickIdle() {
     const hls = this.hls,
-          config = hls.config;
+          config = hls.config,
+          media = this.media;
 
     // if video not attached AND
     // start fragment already requested OR start frag prefetch disable
     // exit loop
     // => if media not attached but start frag prefetch is enabled and start frag not requested yet, we will not exit loop
-    if (this.levelLastLoaded !== undefined && !this.media &&
+    if (this.levelLastLoaded !== undefined && !media &&
       (this.startFragRequested || !config.startFragPrefetch)) {
       return true;
     }
 
     // if we have not yet loaded any fragment, start loading from start position
-    let pos = this.loadedmetadata ? this.media.currentTime : this.nextLoadPosition;
+    let pos = this.loadedmetadata ? media.currentTime : this.nextLoadPosition;
     // determine next load level
     let level = hls.nextLoadLevel;
 
@@ -257,11 +258,14 @@ class StreamController extends EventHandler {
     } else {
       maxBufLen = config.maxBufferLength;
     }
+    if (!config.disableStartBufReduce && this.loadedmetadata && pos<2 && media.paused) {
+      maxBufLen = config.maxStartBufferLength;
+    }
 
     // determine next candidate fragment to be loaded, based on current position and end of buffer position
     // ensure up to `config.maxMaxBufferLength` of buffer upfront
 
-    const bufferInfo = BufferHelper.bufferInfo(this.media, pos, config.maxBufferHole),
+    const bufferInfo = BufferHelper.bufferInfo(media, pos, config.maxBufferHole),
           bufferLen = bufferInfo.len;
     // Stay idle if we are still with buffer margins
     if (bufferLen >= maxBufLen) {
