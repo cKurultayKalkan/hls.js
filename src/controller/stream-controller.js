@@ -81,7 +81,7 @@ class StreamController extends EventHandler {
       }
       if (this.fragPreviousSaved) {
         this.fragPrevious = this.fragPreviousSaved;
-        delete this.fragPrevious;
+        delete this.fragPreviousSaved;
       }
       this.level = -1;
       this.fragLoadError = 0;

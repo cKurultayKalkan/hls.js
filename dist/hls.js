@@ -2113,7 +2113,7 @@ var StreamController = function (_EventHandler) {
         }
         if (this.fragPreviousSaved) {
           this.fragPrevious = this.fragPreviousSaved;
-          delete this.fragPrevious;
+          delete this.fragPreviousSaved;
         }
         this.level = -1;
         this.fragLoadError = 0;
@@ -7721,7 +7721,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-219';
+      return '0.6.1-220';
     }
   }, {
     key: 'Events',
