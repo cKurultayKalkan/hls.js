@@ -1,6 +1,6 @@
 {
   "name": "@hola.org/hls.js",
-  "version": "0.6.1-222",
+  "version": "0.6.1-223",
   "license": "Apache-2.0",
   "description": "Media Source Extension - HLS library, by/for Dailymotion",
   "homepage": "https://github.com/hola/hls.js",
