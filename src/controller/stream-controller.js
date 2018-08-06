@@ -1336,10 +1336,10 @@ class StreamController extends EventHandler {
         this.loadedmetadata = true;
         // only adjust currentTime if different from startPosition or if startPosition not buffered
         // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
-        let startPosition = this.startPosition,
-            startPositionBuffered = BufferHelper.isBuffered(media, startPosition);
-        if (currentTime !== this.startPosition || !startPositionBuffered) {
+        let startPosition = media.seeking ? currentTime : this.startPosition;
+        if (currentTime !== startPosition) {
           logger.log(`target start position:${startPosition}`);
+          let startPositionBuffered = BufferHelper.isBuffered(media, startPosition);
           // if startPosition not buffered, let's seek to buffered.start(0)
           if(!startPositionBuffered) {
             // XXX pavelki: fix case when we asked to seek during the first

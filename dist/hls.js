@@ -3407,10 +3407,10 @@ var StreamController = function (_EventHandler) {
           this.loadedmetadata = true;
           // only adjust currentTime if different from startPosition or if startPosition not buffered
           // at that stage, there should be only one buffered range, as we reach that code after first fragment has been buffered
-          var startPosition = this.startPosition,
-              startPositionBuffered = _bufferHelper2.default.isBuffered(media, startPosition);
-          if (currentTime !== this.startPosition || !startPositionBuffered) {
+          var startPosition = media.seeking ? currentTime : this.startPosition;
+          if (currentTime !== startPosition) {
             _logger.logger.log('target start position:' + startPosition);
+            var startPositionBuffered = _bufferHelper2.default.isBuffered(media, startPosition);
             // if startPosition not buffered, let's seek to buffered.start(0)
             if (!startPositionBuffered) {
               // XXX pavelki: fix case when we asked to seek during the first
@@ -7720,7 +7720,7 @@ var Hls = function () {
     key: 'version',
     get: function get() {
       // replaced with browserify-versionify transform
-      return '0.6.1-221';
+      return '0.6.1-222';
     }
   }, {
     key: 'Events',
